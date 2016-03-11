@@ -39,9 +39,9 @@ public class CtifWriter {
 		stream.write(palette.length > 16 ? 8 : 4); // BPP (byte)
 
 		if (Main.MODE != Main.Mode.COMPUTERCRAFT) {
-			stream.write(16); // Palette array size
-			stream.write(3);
-			stream.write(0); // Palette entry size
+			stream.write(3); // Palette entry size
+			stream.write(16);
+			stream.write(0); // Palette array size
 			for (int i = 0; i < 16; i++) {
 				stream.write(palette[i].getRGB() & 0xFF);
 				stream.write((palette[i].getRGB() >> 8) & 0xFF);

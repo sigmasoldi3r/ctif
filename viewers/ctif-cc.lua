@@ -63,9 +63,9 @@ if bpp ~= 4 then
   error("Unsupported bit depth: " .. bpp)
 end
 
-local customColors = file:read()
-local ccEntrySize = readShort()
-if customColors > 0 then
+local ccEntrySize = file:read()
+local ccArraySize = readShort()
+if ccArraySize > 0 then
   error("Custom colors are not supported on ComputerCraft!")
 end
 
