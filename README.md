@@ -29,7 +29,9 @@ If you just want to view CTIF files, see the viewers directory.
 large, keep in mind it operates on *characters*, while the converter operates on *pixels* - to convert from one to the other, 
 multiply the width by 2 and the height by 3.
 
-An OpenComputers viewer will be released as part of the promised-at-BTM15 release of OpenPoint soon.
+* ctif-oc.lua - OpenComputers image viewer. Not optimized - expect it to load images slower than what you saw at BTM. Requires Lua 5.3.
+
+An optimized OpenComputers viewer will be released as part of the promised-at-BTM15 release of OpenPoint soon.
 
 # Compiling
 
