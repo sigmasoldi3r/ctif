@@ -16,7 +16,7 @@ will be your best friend. Here's an example command:
 
 will convert image.png to image.ctif and kindly save preview.png as a preview file. (The "-P preview.png" can be omitted)
 
-    java -jar CTIFConverter.jar -m cc -w 102 -h 57 -o image.ctif image.png
+    java -jar CTIFConverter.jar -m cc -W 102 -H 57 -o image.ctif image.png
 
 will convert your image into a ComputerCraft picture of at most 102x57. If you want to ignore the aspect ratio and force it to be 
 exactly 102x57, use "-N".
@@ -28,6 +28,8 @@ If you just want to view CTIF files, see the viewers directory.
 * ctif-cc.lua - ComputerCraft image viewer. "ctif-cc {file} [monitor side]" to use. If it errors about the image size being too 
 large, keep in mind it operates on *characters*, while the converter operates on *pixels* - to convert from one to the other, 
 multiply the width by 2 and the height by 3.
+
+An OpenComputers viewer will be released as part of the promised-at-BTM15 release of OpenPoint soon.
 
 # Compiling
 
