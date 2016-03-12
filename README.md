@@ -2,6 +2,9 @@
 
 An image format for OpenComputers and ComputerCraft. See releases for JAR converter binaries.
 
+* [OpenComputers Thread/Examples](https://oc.cil.li/index.php?/topic/864-chenthread-image-format-high-quality-images-on-opencomputers/)
+* [ComputerCraft Thread/Examples](http://www.computercraft.info/forums2/index.php?/topic/26186-chenthread-image-format-quality-images-on-18-computercraft)
+
 # Usage
 
 To run CTIFConverter, you need Java 7 and a recent enough version of ImageMagick. If you don't have ImageMagick, install it from your package manager. If you're on 
