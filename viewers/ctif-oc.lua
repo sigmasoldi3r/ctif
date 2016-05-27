@@ -153,7 +153,10 @@ function gpuFG()
   end
 end
 
-function drawImage(data)
+function drawImage(data, offx, offy)
+  if offx == nil then offx = 0 end
+  if offy == nil then offy = 0 end
+
   local WIDTH = data[2][1]
   local HEIGHT = data[2][2]
 
@@ -165,6 +168,7 @@ function drawImage(data)
   local cw = 0
 
   for y=0,HEIGHT-1 do
+    local str = ""
     for x=0,WIDTH-1 do
       local ind = (y * WIDTH) + x + 1
       local gBG = gpuBG()
@@ -178,13 +182,25 @@ function drawImage(data)
         bg = pal[(data[1][ind] >> 4) & 0x0F]
         cw = ((data[1][ind] >> 8) & 0xFF) + 1
       end
-      if gBG ~= bg then
-        gpu.setBackground(bg)
+      if (gBG == fg) and (gFG == bg) then
+        str = str .. unicode.char(q[cw ^ 255])
+      elseif (gBG ~= bg) or (gFG ~= fg) then
+        if #str > 0 then
+          gpu.set(x + 1 + offx - unicode.wlen(str), y + 1 + offy, str)
+        end
+        if gBG ~= bg then
+          gpu.setBackground(bg)
+        end
+        if gFG ~= fg then
+          gpu.setForeground(fg)
+        end
+        str = unicode.char(q[cw])
+      else
+        str = str .. unicode.char(q[cw])
       end
-      if gFG ~= fg then
-        gpu.setForeground(fg)
-      end
-      gpu.set(x + 1, y + 1, unicode.char(q[cw]))
+    end
+    if #str > 0 then
+      gpu.set(WIDTH + 1 - unicode.wlen(str) + offx, y + 1 + offy, str)
     end
   end
 end
