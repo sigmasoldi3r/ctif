@@ -18,7 +18,7 @@ for i=0,255 do
   dat = dat | (i & 0x20) >> 5 << 1
   dat = dat | (i & 0x40) >> 6 << 3
   dat = dat | (i & 0x80) >> 7
-  q[i + 1] = 0x2800 | dat
+  q[i + 1] = unicode.char(0x2800 | dat)
 end
 
 function error(str)
@@ -165,14 +165,18 @@ function drawImage(data, offx, offy)
 
   local bg = 0
   local fg = 0
-  local cw = 0
+  local cw = 1
+  local noBG = false
+  local noFG = false
+  local ind = 1
+
+  local gBG = gpuBG()
+  local gFG = gpuFG()
 
   for y=0,HEIGHT-1 do
     local str = ""
     for x=0,WIDTH-1 do
-      local ind = (y * WIDTH) + x + 1
-      local gBG = gpuBG()
-      local gFG = gpuFG()
+      ind = (y * WIDTH) + x + 1
       if data[2][3] > 4 then
         bg = pal[data[1][ind] & 0xFF]
         fg = pal[(data[1][ind] >> 8) & 0xFF]
@@ -182,21 +186,33 @@ function drawImage(data, offx, offy)
         bg = pal[(data[1][ind] >> 4) & 0x0F]
         cw = ((data[1][ind] >> 8) & 0xFF) + 1
       end
-      if (gBG == fg) and (gFG == bg) then
-        str = str .. unicode.char(q[cw ^ 255])
-      elseif (gBG ~= bg) or (gFG ~= fg) then
+      noBG = (cw == 256)
+      noFG = (cw == 1)
+      if (noFG or (gBG == fg)) and (noBG or (gFG == bg)) then
+        str = str .. q[257 - cw]
+--        str = str .. "I"
+      elseif (noBG or (gBG == bg)) and (noFG or (gFG == fg)) then
+        str = str .. q[cw]
+      else
         if #str > 0 then
           gpu.set(x + 1 + offx - unicode.wlen(str), y + 1 + offy, str)
         end
+        if (gBG == fg and gFG ~= bg) or (gFG == bg and gBG ~= fg) then
+          cw = 257 - cw
+          local t = bg
+          bg = fg
+          fg = t
+        end
         if gBG ~= bg then
           gpu.setBackground(bg)
+          gBG = bg
         end
         if gFG ~= fg then
           gpu.setForeground(fg)
+          gFG = fg
         end
-        str = unicode.char(q[cw])
-      else
-        str = str .. unicode.char(q[cw])
+        str = q[cw]
+--        if (not noBG) and (not noFG) then str = "C" elseif (not noBG) then str = "B" elseif (not noFG) then str = "F" else str = "c" end
       end
     end
     if #str > 0 then
