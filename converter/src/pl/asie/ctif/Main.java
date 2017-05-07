@@ -5,15 +5,20 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
+import pl.asie.ctif.platform.Platform;
+import pl.asie.ctif.platform.PlatformComputerCraft;
+import pl.asie.ctif.platform.PlatformOpenComputers;
 
 public class Main {
 	private static class Parameters {
-		@Parameter(names = {"-m", "--mode"}, description = "Target platform (cc, oc, oc-tier2)")
-		private String mode = "oc";
+		@Parameter(names = {"-m", "--mode"}, description = "Target platform (cc, cc-paletted, oc-tier2, oc-tier3)")
+		private String mode = "oc-tier3";
 
 		@Parameter(names = {"-d", "--debug"}, description = "Enable debugging", hidden = true)
 		private boolean debug = false;
@@ -40,27 +45,18 @@ public class Main {
 		private boolean help;
 	}
 
-	public enum Mode {
-		COMPUTERCRAFT("cc", 2, 3, 164 * 2, 81 * 3, 2),
-		OC_TIER_3("oc", 2, 4, 320, 200, 1),
-		OC_TIER_2("oc-tier2", 2, 4, 160, 100, 1);
+	public static Platform PLATFORM = null;
+	private static final Map<String, Platform> PLATFORMS = new HashMap<>();
 
-		public final String key;
-		public final int pw, ph, dw, dh;
-		public final int platformId;
-
-		Mode(String name, int pw, int ph, int dw, int dh, int platformId) {
-			this.key = name;
-			this.pw = pw;
-			this.ph = ph;
-			this.dw = dw;
-			this.dh = dh;
-			this.platformId = platformId;
-		}
+	static {
+		PLATFORMS.put("cc", new PlatformComputerCraft(false));
+		PLATFORMS.put("cc-paletted", new PlatformComputerCraft(true));
+//		PLATFORMS.put("oc-tier1", new PlatformOpenComputers(1));
+		PLATFORMS.put("oc-tier2", new PlatformOpenComputers(2));
+		PLATFORMS.put("oc-tier3", new PlatformOpenComputers(3));
 	}
 
     public static boolean DEBUG = false;
-	public static Mode MODE = null;
 
 	private static Parameters params;
 
@@ -81,9 +77,9 @@ public class Main {
 			System.exit(0);
 		}
 
-		for (Mode mode : Mode.values()) {
-			if (mode.key.equalsIgnoreCase(params.mode)) {
-				MODE = mode;
+		for (Map.Entry<String, Platform> entry : PLATFORMS.entrySet()) {
+			if (entry.getKey().equalsIgnoreCase(params.mode)) {
+				PLATFORM = entry.getValue();
 				break;
 			}
 		}
@@ -93,47 +89,53 @@ public class Main {
 			System.exit(1);
 		}
 
-		if (MODE == null) {
+		if (PLATFORM == null) {
 			System.err.println(String.format("Invalid mode: %s", params.mode));
 			System.exit(1);
 		}
 
-		int width = MODE.dw, height = MODE.dh;
-		Color[] palette = Utils.getPalette(MODE);
-
-		if (params.w > width && params.h > height) {
-			System.err.println(String.format("Size too large: %dx%d (maximum size: %dx%d)", params.w, params.h, width, height));
-			System.exit(1);
-		} else if (params.w > width) {
-			System.err.println(String.format("Width too large: %d (maximum size: %dx%d)", params.w, width, height));
-			System.exit(1);
-		} else if (params.h > height) {
-			System.err.println(String.format("Height too large: %d (maximum size: %dx%d)", params.h, width, height));
-			System.exit(1);
-		}
-
-		if (params.w > 0) width = rCeil(params.w, MODE.pw);
-		if (params.h > 0) height = rCeil(params.h, MODE.ph);
-
 		DEBUG = params.debug;
 
 		BufferedImage image = Utils.loadImage(params.files.get(0));
-
-		// 300, 200; 200, 300
-		// height*image.getWidth()/image.getHeight()
-
-		if (!params.ignoreAspectRatio) {
-			float aspectScreen = (float) width / height;
-			float aspectImage = (float) image.getWidth() / image.getHeight();
-			if (aspectScreen >= aspectImage) {
-				width = rCeil((int) Math.floor((float) height * aspectImage), MODE.pw);
-			} else {
-				height = rCeil((int) Math.floor((float) width / aspectImage), MODE.ph);
-			}
+		if (image == null) {
+			System.err.println(String.format("Could not load image: %s", params.files.get(0)));
+			System.exit(1);
 		}
 
-		if (MODE == Mode.OC_TIER_2 || MODE == Mode.OC_TIER_3) {
-			PaletteGenerator generator = new PaletteGenerator();
+		Color[] palette = PLATFORM.getPalette();
+		params.w = (params.w > 0) ? rCeil(params.w, PLATFORM.getCharWidth()) : 0;
+		params.h = (params.h > 0) ? rCeil(params.h, PLATFORM.getCharHeight()) : 0;
+
+		if (params.w > 0 && params.h == 0) {
+			params.h = params.w * image.getHeight() / image.getWidth();
+		} else if (params.w == 0 && params.h > 0) {
+			params.w = params.h * image.getWidth() / image.getHeight();
+		}
+
+		if (params.w * params.h > PLATFORM.getCharsPx()) {
+			System.err.println(String.format("Size too large: %dx%d (maximum size: %d pixels)", params.w, params.h, PLATFORM.getCharsPx()));
+			System.exit(1);
+		} else if (params.w > PLATFORM.getWidthPx()) {
+			System.err.println(String.format("Width too large: %d (maximum width: %d)", params.w, PLATFORM.getWidthPx()));
+			System.exit(1);
+		} else if (params.h > PLATFORM.getHeightPx()) {
+			System.err.println(String.format("Height too large: %d (maximum height: %d)", params.h, PLATFORM.getHeightPx()));
+			System.exit(1);
+		}
+
+		if (params.w == 0 || params.h == 0) {
+			float x = (params.ignoreAspectRatio ? PLATFORM.getDefaultAspectRatio() : (float) image.getWidth() / image.getHeight());
+			float y = 1.0f;
+			float a = Math.min(Math.min(
+					(float) PLATFORM.getWidthPx() / x,
+					(float) PLATFORM.getHeightPx() / y),
+					(float) Math.sqrt((float) PLATFORM.getCharsPx() / (x*y)));
+			params.w = rCeil((int) Math.floor(x * a), PLATFORM.getCharWidth());
+			params.h = rCeil((int) Math.floor(y * a), PLATFORM.getCharHeight());
+		}
+
+		if (PLATFORM.getCustomColorCount() > 0) {
+			PaletteGenerator generator = new PaletteGenerator(PLATFORM.getCustomColorCount());
 			palette = generator.generate(image, palette);
 		}
 
@@ -142,6 +144,9 @@ public class Main {
 			paletteImage.setRGB(i, 0, palette[i].getRGB());
 		}
 		Utils.saveImage(paletteImage, "palette.png");
+
+		int width = params.w;
+		int height = params.h;
 
 		BufferedImage resizedImage = image.getWidth() == width && image.getHeight() == height ? image : Utils.resize(image, width, height, false);
 		try {

@@ -1,4 +1,6 @@
 local pal = {"0","1","2","3","4","5","6","7","8","9","a","b","c","d","e","f"}
+local oldCols = {}
+local colsChanged = false
 local ctable = {}
 local hdr = {67,84,73,70}
 local args = {...}
@@ -66,7 +68,21 @@ end
 local ccEntrySize = file:read()
 local ccArraySize = readShort()
 if ccArraySize > 0 then
-  error("Custom colors are not supported on ComputerCraft!")
+  if t.setPaletteColour == nil then
+    error("Custom colors are not supported on this version of ComputerCraft! Please upgrade.")
+  else
+    for i=0,ccArraySize-1 do
+      local oldColR, oldColG, oldColB = t.getPaletteColour(bit.blshift(1, i))
+      oldCols[i*3 + 1] = oldColR
+      oldCols[i*3 + 2] = oldColG
+      oldCols[i*3 + 3] = oldColB
+      local colB = file:read() / 255
+      local colG = file:read() / 255
+      local colR = file:read() / 255
+      t.setPaletteColour(bit.blshift(1, i), colR, colG, colB)
+    end
+    colsChanged = true
+  end
 end
 
 -- Prepare ideal terminal size
@@ -127,4 +143,12 @@ for x=0,width-1 do
 end
 t.setCursorPos(xoff, yoff + y)
 t.blit(chs, fgs, bgs)
+end
+
+local event, key = os.pullEvent( "key" )
+
+if colsChanged then
+  for i=0,ccArraySize-1 do
+    t.setPaletteColour(bit.blshift(1, i), oldCols[i*3 + 1], oldCols[i*3 + 2], oldCols[i*3 + 3])
+  end
 end

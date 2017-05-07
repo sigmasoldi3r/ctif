@@ -1,5 +1,7 @@
 package pl.asie.ctif;
 
+import pl.asie.ctif.platform.PlatformComputerCraft;
+
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -15,8 +17,8 @@ public class CtifWriter {
     public BufferedImage write(OutputStream stream, BufferedImage image, Color[] palette) throws IOException {
 		BufferedImage output = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_3BYTE_BGR);
 
-		int pw = Main.MODE.pw;
-		int ph = Main.MODE.ph;
+		int pw = Main.PLATFORM.getCharWidth();
+		int ph = Main.PLATFORM.getCharHeight();
         int cw = image.getWidth() / pw;
         int ch = image.getHeight() / ph;
 
@@ -27,8 +29,8 @@ public class CtifWriter {
 
 		stream.write(1); // Header version
 		stream.write(0); // Platform variant (0 - default)
-		stream.write(Main.MODE.platformId);
-		stream.write(Main.MODE.platformId >> 8); // Platform ID
+		stream.write(Main.PLATFORM.platformId);
+		stream.write(Main.PLATFORM.platformId >> 8); // Platform ID
         stream.write(cw & 0xFF);
         stream.write(cw >> 8); // Width in chars
         stream.write(ch & 0xFF);
@@ -38,7 +40,7 @@ public class CtifWriter {
 
 		stream.write(palette.length > 16 ? 8 : 4); // BPP (byte)
 
-		if (Main.MODE != Main.Mode.COMPUTERCRAFT) {
+		if (Main.PLATFORM.getCustomColorCount() > 0) {
 			stream.write(3); // Palette entry size
 			stream.write(16);
 			stream.write(0); // Palette array size
@@ -115,7 +117,7 @@ public class CtifWriter {
                     quadrant = 0;
                 }
 
-				if (Main.MODE == Main.Mode.COMPUTERCRAFT) {
+				if (Main.PLATFORM instanceof PlatformComputerCraft) {
 					if ((quadrant & 0x01) != 0) {
 						int t = fgIndex;
 						fgIndex = bgIndex;

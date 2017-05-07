@@ -5,13 +5,15 @@ import java.awt.image.BufferedImage;
 import java.util.Arrays;
 
 public class PaletteGenerator {
-    public PaletteGenerator() {
+    private final int colors;
 
+    public PaletteGenerator(int colors) {
+        this.colors = colors;
     }
 
     public Color[] generate(BufferedImage image, Color[] base) {
-        int[] pixels = Utils.getRGB(Utils.colorRemap(image, 16));
-        int[] table = new int[16];
+        int[] pixels = Utils.getRGB(Utils.colorRemap(image, colors));
+        int[] table = new int[colors];
         int i = 0;
         int j = 0;
 
