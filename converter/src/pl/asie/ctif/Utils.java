@@ -179,4 +179,14 @@ public final class Utils {
 		}
 		return s2b.getImage();
 	}
+
+	public static int getRGB(float[] mean) {
+    	float r1 = mean[0] + 0.9563f * mean[1] + 0.6210f * mean[2];
+		float g1 = mean[0] - 0.2721f * mean[1] - 0.6474f * mean[2];
+		float b1 = mean[0] - 1.1070f * mean[1] + 1.7046f * mean[2];
+		if (r1 < 0) r1 = 0; if (r1 > 1) r1 = 1;
+		if (g1 < 0) g1 = 0; if (g1 > 1) g1 = 1;
+		if (b1 < 0) b1 = 0; if (b1 > 1) b1 = 1;
+		return (Math.round(r1 * 255) << 16) | (Math.round(g1 * 255) << 8) | Math.round(b1 * 255);
+	}
 }

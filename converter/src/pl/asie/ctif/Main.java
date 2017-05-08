@@ -20,8 +20,8 @@ public class Main {
 		@Parameter(names = {"-m", "--mode"}, description = "Target platform (cc, cc-paletted, oc-tier2, oc-tier3)")
 		private String mode = "oc-tier3";
 
-		@Parameter(names = {"--disable-dither"}, description = "Disable dither")
-		private boolean disableDither = false;
+		@Parameter(names = {"--dither-level"}, description = "Dither level. 0 = off, 1 = full (default)")
+		private float ditherLevel = 1.0f;
 
 		@Parameter(names = {"-d", "--debug"}, description = "Enable debugging", hidden = true)
 		private boolean debug = false;
@@ -137,51 +137,44 @@ public class Main {
 			params.h = rCeil((int) Math.floor(y * a), PLATFORM.getCharHeight());
 		}
 
-		if (PLATFORM.getCustomColorCount() > 0) {
-			PaletteGenerator generator = new PaletteGenerator(PLATFORM.getCustomColorCount());
-			palette = generator.generate(image, palette);
-		}
-
 		int width = params.w;
 		int height = params.h;
 
-		boolean newCode = true;
+		BufferedImage resizedImage = image.getWidth() == width && image.getHeight() == height ? image : Utils.resize(image, width, height, false);
 
-		if (!newCode) {
-			BufferedImage paletteImage = new BufferedImage(palette.length, 1, BufferedImage.TYPE_3BYTE_BGR);
-			for (int i = 0; i < palette.length; i++) {
-				paletteImage.setRGB(i, 0, palette[i].getRGB());
-			}
-			Utils.saveImage(paletteImage, "palette.png");
+		if (PLATFORM.getCustomColorCount() > 0) {
+			System.err.println("Generating palette...");
+			PaletteGenerator generator = new PaletteGenerator(resizedImage, palette, PLATFORM.getCustomColorCount());
+			palette = generator.generate();
 		}
 
-		BufferedImage resizedImage = image.getWidth() == width && image.getHeight() == height ? image : Utils.resize(image, width, height, false);
 		try {
-			BufferedImage inputImage = newCode ? resizedImage : Utils.dither(resizedImage, "palette.png");
-			BufferedImage outputImage = inputImage;
+			BufferedImage outputImage = resizedImage;
 
-			if (newCode) {
-				Converter writer = new Converter(palette, resizedImage,
-						params.disableDither ? new float[] {
-								0
-						} : new float[] {
-								0, 0, 0,
-								0, 0, 7f/16f,
-								3f/16f, 5f/16f, 1f/16f
-						});
-				try {
-					outputImage = writer.write(new FileOutputStream(params.outputFilename != null ? params.outputFilename : params.files.get(0) + ".ctif"));
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
+			float[] ditherArray = new float[] {
+					0, 0, 0,
+					0, 0, 7f/16f,
+					3f/16f, 5f/16f, 1f/16f
+			};
 
-			} else {
-				CtifWriter writer = new CtifWriter();
-				try {
-					outputImage = writer.write(new FileOutputStream(params.outputFilename != null ? params.outputFilename : params.files.get(0) + ".ctif"), inputImage, palette);
-				} catch (Exception e) {
-					e.printStackTrace();
+			if (params.ditherLevel == 0) {
+				ditherArray = new float[] { 0 };
+			} else if (params.ditherLevel != 1) {
+				for (int i = 0; i < ditherArray.length; i++) {
+					ditherArray[i] *= params.ditherLevel;
 				}
+			}
+
+			System.err.println("Converting image...");
+
+			Converter writer = new Converter(palette, resizedImage,
+					ditherArray
+			);
+
+			try {
+				outputImage = writer.write(new FileOutputStream(params.outputFilename != null ? params.outputFilename : params.files.get(0) + ".ctif"));
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
 
 			if (params.previewFilename != null) {
