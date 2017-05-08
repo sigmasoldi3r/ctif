@@ -20,6 +20,9 @@ public class Main {
 		@Parameter(names = {"-m", "--mode"}, description = "Target platform (cc, cc-paletted, oc-tier2, oc-tier3)")
 		private String mode = "oc-tier3";
 
+		@Parameter(names = {"--disable-dither"}, description = "Disable dither")
+		private boolean disableDither = false;
+
 		@Parameter(names = {"-d", "--debug"}, description = "Enable debugging", hidden = true)
 		private boolean debug = false;
 
@@ -139,25 +142,46 @@ public class Main {
 			palette = generator.generate(image, palette);
 		}
 
-		BufferedImage paletteImage = new BufferedImage(palette.length, 1, BufferedImage.TYPE_3BYTE_BGR);
-		for (int i = 0; i < palette.length; i++) {
-			paletteImage.setRGB(i, 0, palette[i].getRGB());
-		}
-		Utils.saveImage(paletteImage, "palette.png");
-
 		int width = params.w;
 		int height = params.h;
 
+		boolean newCode = true;
+
+		if (!newCode) {
+			BufferedImage paletteImage = new BufferedImage(palette.length, 1, BufferedImage.TYPE_3BYTE_BGR);
+			for (int i = 0; i < palette.length; i++) {
+				paletteImage.setRGB(i, 0, palette[i].getRGB());
+			}
+			Utils.saveImage(paletteImage, "palette.png");
+		}
+
 		BufferedImage resizedImage = image.getWidth() == width && image.getHeight() == height ? image : Utils.resize(image, width, height, false);
 		try {
-			BufferedImage inputImage = Utils.dither(resizedImage, "palette.png");
+			BufferedImage inputImage = newCode ? resizedImage : Utils.dither(resizedImage, "palette.png");
 			BufferedImage outputImage = inputImage;
 
-			CtifWriter writer = new CtifWriter();
-			try {
-				outputImage = writer.write(new FileOutputStream(params.outputFilename != null ? params.outputFilename : params.files.get(0) + ".ctif"), inputImage, palette);
-			} catch (Exception e) {
-				e.printStackTrace();
+			if (newCode) {
+				Converter writer = new Converter(palette, resizedImage,
+						params.disableDither ? new float[] {
+								0
+						} : new float[] {
+								0, 0, 0,
+								0, 0, 7f/16f,
+								3f/16f, 5f/16f, 1f/16f
+						});
+				try {
+					outputImage = writer.write(new FileOutputStream(params.outputFilename != null ? params.outputFilename : params.files.get(0) + ".ctif"));
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+
+			} else {
+				CtifWriter writer = new CtifWriter();
+				try {
+					outputImage = writer.write(new FileOutputStream(params.outputFilename != null ? params.outputFilename : params.files.get(0) + ".ctif"), inputImage, palette);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
 			}
 
 			if (params.previewFilename != null) {

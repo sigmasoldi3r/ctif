@@ -127,14 +127,23 @@ public final class Utils {
 		return new float[]{y1, u1, v1};
 	}
 
+	public static void addQuantError(float[] target, float[] expected, float[] received, float mul) {
+    	if (mul != 0.0f) {
+			for (int i = 0; i < target.length; i++) {
+				target[i] += (expected[i] - received[i]) * mul;
+			}
+		}
+	}
+
     public static double getColorDistance(int c1, int c2) {
 		return Math.sqrt(getColorDistanceSq(c1, c2));
     }
 
 	public static double getColorDistanceSq(int c1, int c2) {
-		float[] f1 = getYUV(c1);
-		float[] f2 = getYUV(c2);
+    	return getColorDistanceSq(getYUV(c1), getYUV(c2));
+	}
 
+	public static double getColorDistanceSq(float[] f1, float[] f2) {
 		return (f1[0] - f2[0]) * (f1[0] - f2[0]) +
 				(f1[1] - f2[1]) * (f1[1] - f2[1]) +
 				(f1[2] - f2[2]) * (f1[2] - f2[2]);
