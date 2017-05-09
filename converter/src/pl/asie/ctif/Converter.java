@@ -1,6 +1,8 @@
 package pl.asie.ctif;
 
 import pl.asie.ctif.platform.PlatformComputerCraft;
+import pl.asie.ctif.platform.PlatformOpenComputers;
+import pl.asie.ctif.platform.PlatformZXSpectrum;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -38,11 +40,11 @@ public class Converter {
 		this.ch = image.getHeight() / ph;
 
 		for (int comp : Utils.getRGB(image)) {
-			img[i++] = Utils.getYUV(comp);
+			img[i++] = Main.COLORSPACE.fromRGB(comp);
 		}
 
 		for (i = 0; i < colors.length; i++) {
-			pal[i] = Utils.getYUV(colors[i].getRGB());
+			pal[i] = Main.COLORSPACE.fromRGB(colors[i].getRGB());
 		}
 	}
 
@@ -97,6 +99,8 @@ public class Converter {
 		int ew = (pw + ditherMatrixOffset * 2);
 		int eh = (ph + ditherMatrixOffset * 2);
 
+		int quadrantLen = (pw * ph + 7) / 8;
+
 		for (int cy = 0; cy < ch; cy++) {
 			for (int cx = 0; cx < cw; cx++) {
 				float[][] pixels = new float[pw * ph][];
@@ -106,7 +110,8 @@ public class Converter {
 					}
 				}
 
-				int bci1 = 0, bci2 = 0, bcq = 0;
+				int bci1 = 0, bci2 = 0;
+				int[] bcq = new int[quadrantLen];
 				double bcerr = Double.MAX_VALUE;
 				float[][] bcea = new float[ew * eh][3];
 				float[][] tPixels = new float[pixels.length][3];
@@ -116,11 +121,11 @@ public class Converter {
 					if (bcerr == 0) break;
 					float[] col1 = pal[ci1];
 
-					for (int ci2 = 0; ci2 < ci1; ci2++) {
+					for (int ci2 = (Main.PLATFORM instanceof PlatformZXSpectrum) ? (ci1 >= 8 ? 8 : 0) : 0; ci2 < ci1; ci2++) {
 						if (bcerr == 0) break;
 						float[] col2 = pal[ci2];
 						double cerr = 0;
-						int cq = 0;
+						int[] cq = new int[quadrantLen];
 
 						for (int i = 0; i < pixels.length; i++) {
 							tPixels[i][0] = pixels[i][0];
@@ -140,7 +145,8 @@ public class Converter {
 							double cerr1 = Utils.getColorDistanceSq(col, col1);
 							double cerr2 = Utils.getColorDistanceSq(col, col2);
 							if (cerr2 < cerr1) {
-								cq |= (1 << (pw * ph - 1 - i));
+								int pos = (pw * ph - 1 - i);
+								cq[pos >> 3] |= (1 << (pos & 7));
 								cerr += cerr2;
 								colR = col2;
 							} else {
@@ -188,34 +194,34 @@ public class Converter {
 					}
 				}
 
-				int quadrant = bcq;
+				int[] quadrant = bcq;
 				int bgIndex = bci1;
 				int fgIndex = bci2;
 				if (bgIndex == fgIndex) {
-					quadrant = 0;
+					for (int i = 0; i < quadrantLen; i++) quadrant[i] = 0;
 				}
 
 				if (Main.PLATFORM instanceof PlatformComputerCraft) {
-					if ((quadrant & 0x01) != 0) {
+					if ((quadrant[0] & 0x01) != 0) {
 						int t = fgIndex;
 						fgIndex = bgIndex;
 						bgIndex = t;
-						quadrant ^= 0x3F;
+						quadrant[0] ^= 0x3F;
 					}
-				} else if (pw * ph > 2) {
+				} else if (Main.PLATFORM instanceof PlatformOpenComputers && pw * ph > 2) {
 					if (bgIndex > fgIndex) {
 						int t = fgIndex;
 						fgIndex = bgIndex;
 						bgIndex = t;
-						quadrant ^= (1 << (pw * ph)) - 1;
+						quadrant[0] ^= (1 << (pw * ph)) - 1;
 					}
 				}
 
-				if (pw * ph == 2 && quadrant == 1) {
+				if (pw * ph == 2 && quadrant[0] == 1) {
 					int t = fgIndex;
 					fgIndex = bgIndex;
 					bgIndex = t;
-					quadrant = 0;
+					quadrant[0] = 0;
 				}
 
 				if (Main.DEBUG) {
@@ -235,16 +241,19 @@ public class Converter {
 					}
 
 					if (pw * ph > 2) {
-						stream.write(quadrant);
+						for (int i = 0; i < quadrantLen; i++)
+							stream.write(quadrant[i]);
 					}
 				} else {
-					stream.write(quadrant);
+					for (int i = 0; i < quadrantLen; i++)
+						stream.write(quadrant[i]);
 				}
 
 				for (int py = 0; py < ph; py++) {
 					for (int px = 0; px < pw; px++) {
-						int i = (1 << (pw * ph - 1)) >> (py * pw + px);
-						if ((quadrant & i) != 0) {
+						int i = (pw * ph - 1) - (py * pw + px);
+
+						if ((quadrant[i >> 3] & (1 << (i & 7))) != 0) {
 							output.setRGB(cx * pw + px, cy * ph + py, palette[fgIndex].getRGB());
 						} else {
 							output.setRGB(cx * pw + px, cy * ph + py, palette[bgIndex].getRGB());

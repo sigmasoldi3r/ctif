@@ -4,21 +4,23 @@ import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
+import pl.asie.ctif.colorspace.Colorspace;
 import pl.asie.ctif.platform.Platform;
 import pl.asie.ctif.platform.PlatformComputerCraft;
 import pl.asie.ctif.platform.PlatformOpenComputers;
+import pl.asie.ctif.platform.PlatformZXSpectrum;
 
 public class Main {
 	private static class Parameters {
 		@Parameter(names = {"-m", "--mode"}, description = "Target platform (cc, cc-paletted, oc-tier2, oc-tier3)")
 		private String mode = "oc-tier3";
+
+		@Parameter(names = {"--colorspace"}, description = "Colorspace (rgb, yuv, yiq)")
+		private String colorspace = "yiq";
 
 		@Parameter(names = {"--dither-level"}, description = "Dither level. 0 = off, 1 = full (default)")
 		private float ditherLevel = 1.0f;
@@ -48,8 +50,10 @@ public class Main {
 		private boolean help;
 	}
 
+	public static Colorspace COLORSPACE = null;
 	public static Platform PLATFORM = null;
 	private static final Map<String, Platform> PLATFORMS = new HashMap<>();
+	private static final Map<String, Colorspace> COLORSPACES = new HashMap<>();
 
 	static {
 		PLATFORMS.put("cc", new PlatformComputerCraft(false));
@@ -57,6 +61,12 @@ public class Main {
 //		PLATFORMS.put("oc-tier1", new PlatformOpenComputers(1));
 		PLATFORMS.put("oc-tier2", new PlatformOpenComputers(2));
 		PLATFORMS.put("oc-tier3", new PlatformOpenComputers(3));
+		PLATFORMS.put("zxspectrum", new PlatformZXSpectrum(0));
+		PLATFORMS.put("zxspectrum-dark", new PlatformZXSpectrum(1));
+
+		COLORSPACES.put("rgb", Colorspace.RGB);
+		COLORSPACES.put("yuv", Colorspace.YUV);
+		COLORSPACES.put("yiq", Colorspace.YIQ);
 	}
 
     public static boolean DEBUG = false;
@@ -83,6 +93,13 @@ public class Main {
 		for (Map.Entry<String, Platform> entry : PLATFORMS.entrySet()) {
 			if (entry.getKey().equalsIgnoreCase(params.mode)) {
 				PLATFORM = entry.getValue();
+				break;
+			}
+		}
+
+		for (Map.Entry<String, Colorspace> entry : COLORSPACES.entrySet()) {
+			if (entry.getKey().equalsIgnoreCase(params.colorspace)) {
+				COLORSPACE = entry.getValue();
 				break;
 			}
 		}

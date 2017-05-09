@@ -34,7 +34,7 @@ public class PaletteGenerator {
 
         for (int i : Utils.getRGB(image)) {
             if (!pointsAdded.containsKey(i)) {
-                float[] key = Utils.getYUV(i);
+                float[] key = Main.COLORSPACE.fromRGB(i);
                 pointsAdded.put(i, key);
                 pointsWeight.put(key, 1);
             } else {
@@ -43,7 +43,7 @@ public class PaletteGenerator {
         }
 
         for (int i = colors; i < centroids.length; i++) {
-            centroids[i] = Utils.getYUV(base[i].getRGB());
+            centroids[i] = Main.COLORSPACE.fromRGB(base[i].getRGB());
         }
 
         for (Map.Entry<float[], Integer> weight : pointsWeight.entrySet()) {
@@ -84,12 +84,12 @@ public class PaletteGenerator {
 
     private Result generateKMeans() {
         for (int i = 0; i < colors; i++) {
-            centroids[i] = Utils.getYUV(image.getRGB(random.nextInt(image.getWidth()), random.nextInt(image.getHeight())));
+            centroids[i] = Main.COLORSPACE.fromRGB(image.getRGB(random.nextInt(image.getWidth()), random.nextInt(image.getHeight())));
         }
 
         double totalError = 0;
 
-        for (int reps = 0; reps < 1000; reps++) {
+        for (int reps = 0; reps < 256; reps++) {
             float[][] means = new float[centroids.length][3];
             int[] meanDivs = new int[centroids.length];
 
@@ -134,7 +134,7 @@ public class PaletteGenerator {
 
         Color[] out = Arrays.copyOf(base, base.length);
         for (int k = 0; k < colors; k++) {
-            out[k] = new Color(Utils.getRGB(centroids[k]) | 0xFF000000);
+            out[k] = new Color(Main.COLORSPACE.toRGB(centroids[k]) | 0xFF000000);
         }
         return new Result(out, totalError);
     }
