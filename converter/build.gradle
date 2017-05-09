@@ -1,0 +1,27 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '1.2.4'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile 'com.mortennobel:java-image-scaling:0.8.6'
+    compile 'com.beust:jcommander:1.69'
+}
+
+sourceSets {
+    main {
+        java.srcDirs = ['src']
+    }
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'pl.asie.ctif.Main'
+    }
+}
+
+build.dependsOn(shadowJar);

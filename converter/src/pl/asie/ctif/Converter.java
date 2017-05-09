@@ -8,22 +8,27 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 public class Converter {
+	public enum DitherMode {
+		NONE,
+		ERROR,
+		ORDERED
+	};
+
 	private final Color[] palette;
 	private final BufferedImage image;
+	private final DitherMode ditherMode;
 	private final float[] ditherMatrix;
 	private final int ditherMatrixSize, ditherMatrixOffset;
 	private final float[][] img;
 	private final float[][] pal;
 	private final int cw, ch, pw, ph;
 
-	public Converter(Color[] colors, BufferedImage image, float[] ditherMatrix) {
+	public Converter(Color[] colors, BufferedImage image, DitherMode ditherMode, float[] ditherMatrix) {
 		int i = 0;
 
+		this.ditherMode = ditherMode;
 		this.ditherMatrix = ditherMatrix;
 		this.ditherMatrixSize = ditherMatrix != null ? (int) Math.sqrt(ditherMatrix.length) : 0;
 		this.ditherMatrixOffset = (ditherMatrixSize - 1) / 2;
@@ -48,7 +53,7 @@ public class Converter {
 		}
 	}
 
-    public BufferedImage write(OutputStream stream) throws IOException {
+	public BufferedImage write(OutputStream stream) throws IOException {
 		BufferedImage output = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_3BYTE_BGR);
 
 		stream.write('C');
@@ -60,10 +65,10 @@ public class Converter {
 		stream.write(0); // Platform variant (0 - default)
 		stream.write(Main.PLATFORM.platformId);
 		stream.write(Main.PLATFORM.platformId >> 8); // Platform ID
-        stream.write(cw & 0xFF);
-        stream.write(cw >> 8); // Width in chars
-        stream.write(ch & 0xFF);
-        stream.write(ch >> 8); // Height in chars
+		stream.write(cw & 0xFF);
+		stream.write(cw >> 8); // Width in chars
+		stream.write(ch & 0xFF);
+		stream.write(ch >> 8); // Height in chars
 		stream.write(pw); // Char width
 		stream.write(ph); // Char height
 
@@ -85,17 +90,17 @@ public class Converter {
 		}
 
 		writePixelData(stream, output);
-        stream.close();
+		stream.close();
 		return output;
-    }
+	}
 
-    private void addQuantError(float[][] pixelArray, int x, int y, int w, int h, float[] expected, float[] received, float mul) {
+	private void addQuantError(float[][] pixelArray, int x, int y, int w, int h, float[] expected, float[] received, float mul) {
 		if (x >= 0 && y >= 0 && x < w && y < h) {
 			Utils.addQuantError(pixelArray[y*w+x], expected, received, mul);
 		}
 	}
 
-    private void writePixelData(OutputStream stream, BufferedImage output) throws IOException {
+	private void writePixelData(OutputStream stream, BufferedImage output) throws IOException {
 		int ew = (pw + ditherMatrixOffset * 2);
 		int eh = (ph + ditherMatrixOffset * 2);
 
@@ -108,6 +113,8 @@ public class Converter {
 		int[] bcq = new int[quadrantLen];
 		int[] cq = new int[quadrantLen];
 
+		float[] colA = new float[3];
+
 		for (int cy = 0; cy < ch; cy++) {
 			for (int cx = 0; cx < cw; cx++) {
 				for (int py = 0; py < ph; py++) {
@@ -118,6 +125,14 @@ public class Converter {
 
 				int bci1 = 0, bci2 = 0;
 				double bcerr = Double.MAX_VALUE;
+
+				if (ditherMode != DitherMode.ERROR) {
+					for (int i = 0; i < pixels.length; i++) {
+						tPixels[i][0] = pixels[i][0];
+						tPixels[i][1] = pixels[i][1];
+						tPixels[i][2] = pixels[i][2];
+					}
+				}
 
 				for (int ci1 = 1; ci1 < pal.length; ci1++) {
 					if (bcerr == 0) break;
@@ -132,54 +147,126 @@ public class Converter {
 							cq[i] = 0;
 						}
 
-						for (int i = 0; i < pixels.length; i++) {
-							tPixels[i][0] = pixels[i][0];
-							tPixels[i][1] = pixels[i][1];
-							tPixels[i][2] = pixels[i][2];
-						}
+						if (ditherMode == DitherMode.NONE) {
+							for (int i = 0; i < tPixels.length; i++) {
+								float[] col = tPixels[i];
+								double cerr1 = Utils.getColorDistanceSq(col, col1);
+								double cerr2 = Utils.getColorDistanceSq(col, col2);
+								if (cerr2 < cerr1) {
+									int pos = (pw * ph - 1 - i);
+									cq[pos >> 3] |= (1 << (pos & 7));
+									cerr += cerr2;
+								} else {
+									cerr += cerr1;
+								}
 
-						for (int i = 0; i < errors.length; i++) {
-							errors[i][0] = 0;
-							errors[i][1] = 0;
-							errors[i][2] = 0;
-						}
-
-						for (int i = 0; i < tPixels.length; i++) {
-							float[] col = tPixels[i];
-							float[] colR = col1;
-							double cerr1 = Utils.getColorDistanceSq(col, col1);
-							double cerr2 = Utils.getColorDistanceSq(col, col2);
-							if (cerr2 < cerr1) {
-								int pos = (pw * ph - 1 - i);
-								cq[pos >> 3] |= (1 << (pos & 7));
-								cerr += cerr2;
-								colR = col2;
-							} else {
-								cerr += cerr1;
+								if (cerr >= bcerr)
+									break;
+							}
+						} else if (ditherMode == DitherMode.ERROR) {
+							for (int i = 0; i < pixels.length; i++) {
+								tPixels[i][0] = pixels[i][0];
+								tPixels[i][1] = pixels[i][1];
+								tPixels[i][2] = pixels[i][2];
 							}
 
-							if (cerr >= bcerr)
-								break;
+							for (int i = 0; i < errors.length; i++) {
+								errors[i][0] = 0;
+								errors[i][1] = 0;
+								errors[i][2] = 0;
+							}
 
-							int qx = (i % pw);
-							int qy = (i / pw);
+							for (int i = 0; i < tPixels.length; i++) {
+								float[] col = tPixels[i];
+								float[] colR = col1;
+								double cerr1 = Utils.getColorDistanceSq(col, col1);
+								double cerr2 = Utils.getColorDistanceSq(col, col2);
+								if (cerr2 < cerr1) {
+									int pos = (pw * ph - 1 - i);
+									cq[pos >> 3] |= (1 << (pos & 7));
+									cerr += cerr2;
+									colR = col2;
+								} else {
+									cerr += cerr1;
+								}
 
-							int ip = ditherMatrixSize * ditherMatrixOffset;
-							for (int iy = 0; iy < ditherMatrixSize-ditherMatrixOffset; iy++) {
-								for (int ix = -ditherMatrixOffset; ix < ditherMatrixSize-ditherMatrixOffset; ix++) {
-									addQuantError(tPixels, qx+ix, qy+iy, pw, ph, col, colR, ditherMatrix[ip]);
-									addQuantError(errors, qx+ix+ditherMatrixOffset, qy+iy+ditherMatrixOffset, ew, eh, col, colR, ditherMatrix[ip]);
-									ip++;
+								if (cerr >= bcerr)
+									break;
+
+								int qx = (i % pw);
+								int qy = (i / pw);
+
+								int ip = ditherMatrixSize * ditherMatrixOffset;
+								for (int iy = 0; iy < ditherMatrixSize - ditherMatrixOffset; iy++) {
+									for (int ix = -ditherMatrixOffset; ix < ditherMatrixSize - ditherMatrixOffset; ix++) {
+										addQuantError(tPixels, qx + ix, qy + iy, pw, ph, col, colR, ditherMatrix[ip]);
+										addQuantError(errors, qx + ix + ditherMatrixOffset, qy + iy + ditherMatrixOffset, ew, eh, col, colR, ditherMatrix[ip]);
+										ip++;
+									}
+								}
+							}
+						} else {
+							for (int i = 0; i < tPixels.length; i++) {
+								float[] col = tPixels[i];
+								int qx = (i % pw);
+								int qy = (i / pw);
+
+								double bicerr = Double.MAX_VALUE;
+								int birat = 0;
+								int jMax = ditherMatrixSize * ditherMatrixSize;
+
+								double cerr1 = Utils.getColorDistanceSq(col, col1);
+								double cerr2 = Utils.getColorDistanceSq(col, col2);
+								if (cerr1 < cerr2) {
+									bicerr = cerr1;
+									birat = 0;
+									for (int j = 1; j < jMax; j++) {
+										colA[0] = (col2[0] * j + col1[0] * (jMax - j)) / jMax;
+										colA[1] = (col2[1] * j + col1[1] * (jMax - j)) / jMax;
+										colA[2] = (col2[2] * j + col1[2] * (jMax - j)) / jMax;
+
+										double icerr = Utils.getColorDistanceSq(col, colA);
+										if (icerr > bicerr) break;
+										bicerr = icerr;
+										birat = j;
+									}
+								} else {
+									bicerr = cerr2;
+									birat = jMax;
+									for (int j = jMax - 1; j > 0; j--) {
+										colA[0] = (col2[0] * j + col1[0] * (jMax - j)) / jMax;
+										colA[1] = (col2[1] * j + col1[1] * (jMax - j)) / jMax;
+										colA[2] = (col2[2] * j + col1[2] * (jMax - j)) / jMax;
+
+										double icerr = Utils.getColorDistanceSq(col, colA);
+										if (icerr > bicerr) break;
+										bicerr = icerr;
+										birat = j;
+									}
+								}
+
+								cerr += bicerr + Utils.getColorDistanceSq(col1, col2) * 0.1;
+								if (cerr >= bcerr)
+									break;
+
+								int threshold = (int) ditherMatrix[((cy * ph + qy) % ditherMatrixSize) * ditherMatrixSize + ((cx * pw + qx) % ditherMatrixSize)];
+								if (threshold < birat) {
+									int pos = (pw * ph - 1 - i);
+									cq[pos >> 3] |= (1 << (pos & 7));
 								}
 							}
 						}
 
 						if (cerr < bcerr) {
-							bci1 = ci1; bci2 = ci2; bcerr = cerr;
-							for (int i = 0; i < errors.length; i++) {
-								bcea[i][0] = errors[i][0];
-								bcea[i][1] = errors[i][1];
-								bcea[i][2] = errors[i][2];
+							bci1 = ci1;
+							bci2 = ci2;
+							bcerr = cerr;
+							if (ditherMode == DitherMode.ERROR) {
+								for (int i = 0; i < errors.length; i++) {
+									bcea[i][0] = errors[i][0];
+									bcea[i][1] = errors[i][1];
+									bcea[i][2] = errors[i][2];
+								}
 							}
 							for (int i = 0; i < quadrantLen; i++) {
 								bcq[i] = cq[i];
@@ -188,14 +275,16 @@ public class Converter {
 					}
 				}
 
-				for (int iy = 0; iy < eh; iy++) {
-					int ry = cy * ph + iy - ditherMatrixOffset;
-					if (ry >= 0 && ry < ch*ph) {
-						for (int ix = 0; ix < ew; ix++) {
-							int rx = cx * pw + ix - ditherMatrixOffset;
-							if (rx >= 0 && rx < cw * pw) {
-								for (int i = 0; i < 3; i++) {
-									img[ry * cw * pw + rx][i] += bcea[iy * ew + ix][i];
+				if (ditherMode == DitherMode.ERROR) {
+					for (int iy = 0; iy < eh; iy++) {
+						int ry = cy * ph + iy - ditherMatrixOffset;
+						if (ry >= 0 && ry < ch * ph) {
+							for (int ix = 0; ix < ew; ix++) {
+								int rx = cx * pw + ix - ditherMatrixOffset;
+								if (rx >= 0 && rx < cw * pw) {
+									for (int i = 0; i < 3; i++) {
+										img[ry * cw * pw + rx][i] += bcea[iy * ew + ix][i];
+									}
 								}
 							}
 						}

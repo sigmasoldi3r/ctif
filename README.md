@@ -33,10 +33,3 @@ multiply the width by 2 and the height by 3.
 * ctif-oc.lua - OpenComputers image viewer. Not optimized - expect it to load images slower than what you saw at BTM. Requires Lua 5.3.
 
 An optimized OpenComputers viewer will be released as part of the promised-at-BTM15 release of OpenPoint soon.
-
-# Compiling
-
-If you want to make a JAR yourself, you need:
-
-* JCommander 1.48+
-* im4java 1.4.0+
