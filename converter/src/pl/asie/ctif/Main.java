@@ -16,6 +16,9 @@ import pl.asie.ctif.platform.PlatformZXSpectrum;
 
 public class Main {
 	private static class Parameters {
+		@Parameter(names = {"--threads"}, description = "Amount of threads to create")
+		private int threads = Runtime.getRuntime().availableProcessors();
+
 		@Parameter(names = {"-m", "--mode"}, description = "Target platform (cc, cc-paletted, oc-tier2, oc-tier3)")
 		private String mode = "oc-tier3";
 
@@ -157,12 +160,21 @@ public class Main {
 		int width = params.w;
 		int height = params.h;
 
+		if (Main.DEBUG) {
+			System.err.println("Using " + params.threads + " threads.");
+		}
+
 		BufferedImage resizedImage = image.getWidth() == width && image.getHeight() == height ? image : Utils.resize(image, width, height);
 
 		if (PLATFORM.getCustomColorCount() > 0) {
+			long time = System.currentTimeMillis();
 			System.err.println("Generating palette...");
 			PaletteGenerator generator = new PaletteGenerator(resizedImage, palette, PLATFORM.getCustomColorCount());
-			palette = generator.generate();
+			palette = generator.generate(params.threads);
+			time = System.currentTimeMillis() - time;
+			if (DEBUG) {
+				System.err.println("Palette generation time: " + time + " ms");
+			}
 		}
 
 		try {
@@ -184,6 +196,7 @@ public class Main {
 
 			System.err.println("Converting image...");
 
+			long time = System.currentTimeMillis();
 			Converter writer = new Converter(palette, resizedImage,
 					ditherArray
 			);
@@ -192,6 +205,10 @@ public class Main {
 				outputImage = writer.write(new FileOutputStream(params.outputFilename != null ? params.outputFilename : params.files.get(0) + ".ctif"));
 			} catch (Exception e) {
 				e.printStackTrace();
+			}
+			time = System.currentTimeMillis() - time;
+			if (DEBUG) {
+				System.err.println("Image conversion time: " + time + " ms");
 			}
 
 			if (params.previewFilename != null) {

@@ -101,9 +101,15 @@ public class Converter {
 
 		int quadrantLen = (pw * ph + 7) / 8;
 
+		float[][] pixels = new float[pw * ph][];
+		float[][] bcea = new float[ew * eh][3];
+		float[][] tPixels = new float[pixels.length][3];
+		float[][] errors = new float[ew * eh][3];
+		int[] bcq = new int[quadrantLen];
+		int[] cq = new int[quadrantLen];
+
 		for (int cy = 0; cy < ch; cy++) {
 			for (int cx = 0; cx < cw; cx++) {
-				float[][] pixels = new float[pw * ph][];
 				for (int py = 0; py < ph; py++) {
 					for (int px = 0; px < pw; px++) {
 						pixels[py * pw + px] = img[(cy * ph + py) * image.getWidth() + cx * pw + px];
@@ -111,11 +117,7 @@ public class Converter {
 				}
 
 				int bci1 = 0, bci2 = 0;
-				int[] bcq = new int[quadrantLen];
 				double bcerr = Double.MAX_VALUE;
-				float[][] bcea = new float[ew * eh][3];
-				float[][] tPixels = new float[pixels.length][3];
-				float[][] errors = new float[ew * eh][3];
 
 				for (int ci1 = 1; ci1 < pal.length; ci1++) {
 					if (bcerr == 0) break;
@@ -125,7 +127,10 @@ public class Converter {
 						if (bcerr == 0) break;
 						float[] col2 = pal[ci2];
 						double cerr = 0;
-						int[] cq = new int[quadrantLen];
+
+						for (int i = 0; i < quadrantLen; i++) {
+							cq[i] = 0;
+						}
 
 						for (int i = 0; i < pixels.length; i++) {
 							tPixels[i][0] = pixels[i][0];
@@ -170,11 +175,14 @@ public class Converter {
 						}
 
 						if (cerr < bcerr) {
-							bci1 = ci1; bci2 = ci2; bcq = cq; bcerr = cerr;
+							bci1 = ci1; bci2 = ci2; bcerr = cerr;
 							for (int i = 0; i < errors.length; i++) {
 								bcea[i][0] = errors[i][0];
 								bcea[i][1] = errors[i][1];
 								bcea[i][2] = errors[i][2];
+							}
+							for (int i = 0; i < quadrantLen; i++) {
+								bcq[i] = cq[i];
 							}
 						}
 					}
@@ -222,10 +230,6 @@ public class Converter {
 					fgIndex = bgIndex;
 					bgIndex = t;
 					quadrant[0] = 0;
-				}
-
-				if (Main.DEBUG) {
-					System.out.println(String.format("NEW %d %d: %d/%d -> %d", cx, cy, bgIndex, fgIndex, quadrant));
 				}
 
 				if (palette.length > 2) {

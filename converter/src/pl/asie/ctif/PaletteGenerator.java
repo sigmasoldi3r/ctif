@@ -3,16 +3,27 @@ package pl.asie.ctif;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class PaletteGenerator {
-
-    public class Result {
-        public final Color[] colors;
-        public final double error;
+    static class Result {
+        final Color[] colors;
+        final double error;
 
         public Result(Color[] colors, double error) {
             this.colors = colors;
             this.error = error;
+        }
+    }
+
+    public class Worker implements Runnable {
+        public Result result;
+
+        @Override
+        public void run() {
+            result = generateKMeans();
         }
     }
 
@@ -62,16 +73,30 @@ public class PaletteGenerator {
         }
     }
 
-    public Color[] generate() {
+    public Color[] generate(int threads) {
         Result bestResult = null;
+        Worker[] workers = new Worker[10];
+        ExecutorService executorService = Executors.newFixedThreadPool(threads);
 
-        for (int i = 0; i < 10; i++) {
-            Result result = generateKMeans();
+        for (int i = 0; i < workers.length; i++) {
+            workers[i] = new Worker();
+            executorService.submit(workers[i]);
+        }
+
+        executorService.shutdown();
+        try {
+            executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        for (int i = 0; i < workers.length; i++) {
+            Result result = workers[i].result;
+            if (Main.DEBUG) {
+                System.out.println("Palette generator worker #" + (i + 1) + " error = " + result.error);
+            }
             if (bestResult == null || bestResult.error > result.error) {
                 bestResult = result;
-            }
-            if (Main.DEBUG) {
-                System.out.println("Palette generator try " + (i+1) + " error = " + result.error);
             }
         }
 
@@ -89,7 +114,7 @@ public class PaletteGenerator {
 
         double totalError = 0;
 
-        for (int reps = 0; reps < 256; reps++) {
+        for (int reps = 0; reps < 128; reps++) {
             float[][] means = new float[centroids.length][3];
             int[] meanDivs = new int[centroids.length];
 
@@ -98,6 +123,7 @@ public class PaletteGenerator {
                 double bestError = knownBestError.get(weight.getKey());
                 int bestCentroid = knownBestCentroid.get(weight.getKey());
                 int mul = weight.getValue();
+
                 for (int i = 0; i < colors; i++) {
                     double err = Utils.getColorDistanceSq(weight.getKey(), centroids[i]);
                     if (err < bestError) {
@@ -106,6 +132,7 @@ public class PaletteGenerator {
                         if (err == 0) break;
                     }
                 }
+
                 totalError += bestError * mul;
                 means[bestCentroid][0] += weight.getKey()[0] * mul;
                 means[bestCentroid][1] += weight.getKey()[1] * mul;
