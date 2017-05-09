@@ -7,15 +7,13 @@ An image format for OpenComputers and ComputerCraft. See releases for JAR conver
 
 # Usage
 
-To run CTIFConverter, you need Java 7 and a recent enough version of ImageMagick. If you don't have ImageMagick, install it from your package manager. If you're on 
-Windows, unpacking the portable version of ImageMagick ([x86](http://www.imagemagick.org/download/binaries/ImageMagick-6.9.3-7-portable-Q16-x86.zip), 
-[x64](http://www.imagemagick.org/download/binaries/ImageMagick-6.9.3-7-portable-Q16-x64.zip)) into your PATH, or the current working directory, *might* help.
+To run CTIFConverter, you need Java 8.
 
     java -jar CTIFConverter.jar -h
 
 will be your best friend. Here's an example command:
 
-    java -jar CTIFConverter.jar -m oc -P preview.png -o image.ctif image.png
+    java -jar CTIFConverter.jar -m oc-tier3 -P preview.png -o image.ctif image.png
 
 will convert image.png to image.ctif and kindly save preview.png as a preview file. (The "-P preview.png" can be omitted)
 
