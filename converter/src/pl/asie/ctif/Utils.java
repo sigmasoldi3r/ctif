@@ -1,11 +1,11 @@
 package pl.asie.ctif;
 
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 
-import org.im4java.core.ConvertCmd;
-import org.im4java.core.IMOperation;
-import org.im4java.core.Stream2BufferedImage;
+import com.mortennobel.imagescaling.ResampleFilters;
+import com.mortennobel.imagescaling.ResampleOp;
 import pl.asie.ctif.colorspace.Colorspace;
 
 import javax.imageio.ImageIO;
@@ -15,57 +15,23 @@ public final class Utils {
 
     }
 
-	public static BufferedImage resize(BufferedImage image, int width, int height, boolean keepAspectRatio) {
-		ConvertCmd cmd = new ConvertCmd();
-		IMOperation op = new IMOperation();
-		op.addImage();
-		op.colorspace("YIQ");
-		op.filter("Lanczos");
-		if (keepAspectRatio) {
-			op.resize(width, height);
-		} else {
-			op.resize(width, height, '!');
-		}
-		op.addImage("png:-");
-
-		Stream2BufferedImage s2b = new Stream2BufferedImage();
-		cmd.setOutputConsumer(s2b);
-		try {
-			cmd.run(op, image);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return s2b.getImage();
+	public static BufferedImage resize(BufferedImage image, int width, int height) {
+    	ResampleOp op = new ResampleOp(width, height);
+    	op.setFilter(ResampleFilters.getLanczos3Filter());
+		return op.filter(image, null);
 	}
 
 	public static BufferedImage resizeBox(BufferedImage image, int width, int height) {
-		ConvertCmd cmd = new ConvertCmd();
-		IMOperation op = new IMOperation();
-		op.addImage();
-		op.filter("Box");
-		op.resize(width, height, '!');
-		op.addImage("png:-");
-
-		Stream2BufferedImage s2b = new Stream2BufferedImage();
-		cmd.setOutputConsumer(s2b);
-		try {
-			cmd.run(op, image);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return s2b.getImage();
+		ResampleOp op = new ResampleOp(width, height);
+		op.setFilter(ResampleFilters.getBoxFilter());
+		return op.filter(image, null);
 	}
 
 	public static void saveImage(BufferedImage image, String location) {
-		ConvertCmd cmd = new ConvertCmd();
-		IMOperation op = new IMOperation();
-		op.addImage();
-		op.addImage(location);
-
-		try {
-			cmd.run(op, image);
+    	try {
+			ImageIO.write(image, "png", new File(location));
 		} catch (Exception e) {
-			e.printStackTrace();
+    		e.printStackTrace();
 		}
 	}
 

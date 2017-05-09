@@ -157,7 +157,7 @@ public class Main {
 		int width = params.w;
 		int height = params.h;
 
-		BufferedImage resizedImage = image.getWidth() == width && image.getHeight() == height ? image : Utils.resize(image, width, height, false);
+		BufferedImage resizedImage = image.getWidth() == width && image.getHeight() == height ? image : Utils.resize(image, width, height);
 
 		if (PLATFORM.getCustomColorCount() > 0) {
 			System.err.println("Generating palette...");
