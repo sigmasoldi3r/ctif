@@ -154,8 +154,10 @@ public class Main {
 			switch (params.ditherMode) {
 				case ORDERED:
 					params.ditherType = "4x4";
+					break;
 				default:
 					params.ditherType = "floyd-steinberg";
+					break;
 			}
 		}
 
@@ -219,18 +221,19 @@ public class Main {
 
 		try {
 			BufferedImage outputImage = resizedImage;
-
 			float[] ditherArray = DITHER_ARRAYS.get(params.ditherType.toLowerCase());
 
 			if (params.ditherLevel == 0) {
 				params.ditherMode = Converter.DitherMode.NONE;
-				ditherArray = new float[] { 0 };
 			} else if (params.ditherLevel != 1) {
+				ditherArray = Arrays.copyOf(ditherArray, ditherArray.length);
+
 				switch (params.ditherMode) {
 					case ERROR:
 						for (int i = 0; i < ditherArray.length; i++) {
 							ditherArray[i] *= params.ditherLevel;
 						}
+						break;
 					case ORDERED:
 						float newScale = params.ditherLevel;
 						float newOffset = ditherArray.length * ((1 - params.ditherLevel) / 2.0f);
@@ -239,6 +242,7 @@ public class Main {
 								ditherArray[i] = (ditherArray[i] - 1) * newScale + newOffset;
 							}
 						}
+						break;
 				}
 			}
 

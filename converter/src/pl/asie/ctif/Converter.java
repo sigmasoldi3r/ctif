@@ -126,14 +126,6 @@ public class Converter {
 				int bci1 = 0, bci2 = 0;
 				double bcerr = Double.MAX_VALUE;
 
-				if (ditherMode != DitherMode.ERROR) {
-					for (int i = 0; i < pixels.length; i++) {
-						tPixels[i][0] = pixels[i][0];
-						tPixels[i][1] = pixels[i][1];
-						tPixels[i][2] = pixels[i][2];
-					}
-				}
-
 				for (int ci1 = 1; ci1 < pal.length; ci1++) {
 					if (bcerr == 0) break;
 					float[] col1 = pal[ci1];
@@ -148,8 +140,8 @@ public class Converter {
 						}
 
 						if (ditherMode == DitherMode.NONE) {
-							for (int i = 0; i < tPixels.length; i++) {
-								float[] col = tPixels[i];
+							for (int i = 0; i < pixels.length; i++) {
+								float[] col = pixels[i];
 								double cerr1 = Utils.getColorDistanceSq(col, col1);
 								double cerr2 = Utils.getColorDistanceSq(col, col2);
 								if (cerr2 < cerr1) {
@@ -178,7 +170,7 @@ public class Converter {
 
 							for (int i = 0; i < tPixels.length; i++) {
 								float[] col = tPixels[i];
-								float[] colR = col1;
+								float[] colR;
 								double cerr1 = Utils.getColorDistanceSq(col, col1);
 								double cerr2 = Utils.getColorDistanceSq(col, col2);
 								if (cerr2 < cerr1) {
@@ -188,6 +180,7 @@ public class Converter {
 									colR = col2;
 								} else {
 									cerr += cerr1;
+									colR = col1;
 								}
 
 								if (cerr >= bcerr)
@@ -206,8 +199,8 @@ public class Converter {
 								}
 							}
 						} else {
-							for (int i = 0; i < tPixels.length; i++) {
-								float[] col = tPixels[i];
+							for (int i = 0; i < pixels.length; i++) {
+								float[] col = pixels[i];
 								int qx = (i % pw);
 								int qy = (i / pw);
 
