@@ -3,28 +3,95 @@ package pl.asie.ctif;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 
-import com.mortennobel.imagescaling.ResampleFilters;
-import com.mortennobel.imagescaling.ResampleOp;
+import org.im4java.core.ConvertCmd;
+import org.im4java.core.IMOperation;
+import org.im4java.core.Stream2BufferedImage;
+import org.im4java.process.OutputConsumer;
 import pl.asie.ctif.colorspace.Colorspace;
 
 import javax.imageio.ImageIO;
 
 public final class Utils {
+	private static int imMode = -1;
+
     private Utils() {
 
     }
 
+    private static ConvertCmd createConvertCmd() {
+    	if (imMode < 0) {
+			ConvertCmd cmd = new ConvertCmd();
+			imMode = 1;
+
+			try {
+				cmd.setOutputConsumer(new OutputConsumer() {
+					@Override
+					public void consumeOutput(InputStream inputStream) throws IOException {
+
+					}
+				});
+				cmd.run(new IMOperation());
+			} catch (Exception e) {
+				if (e.getCause() instanceof IOException) {
+					System.err.println("Warning: ImageMagick not found! Please install ImageMagick for improved scaling quality.");
+					imMode = 0;
+				}
+			}
+
+			if (imMode == 1) {
+				System.err.println("ImageMagick found; using ImageMagick for resizing.");
+			}
+		}
+
+		switch (imMode) {
+			case 0:
+			default:
+				return null;
+			case 1:
+				return new ConvertCmd();
+			case 2:
+				return new ConvertCmd(true);
+		}
+	}
+
 	public static BufferedImage resize(BufferedImage image, int width, int height) {
-    	ResampleOp op = new ResampleOp(width, height);
-    	op.setFilter(ResampleFilters.getLanczos3Filter());
-		return op.filter(image, null);
+		ConvertCmd cmd = createConvertCmd();
+		if (cmd == null) {
+			BufferedImage resizedImage = new BufferedImage(width, height, image.getType());
+			Graphics2D g = resizedImage.createGraphics();
+			g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+			g.drawImage(image, 0, 0, width, height, null);
+			g.dispose();
+			return resizedImage;
+		}
+		IMOperation op = new IMOperation();
+		op.addImage();
+		op.colorspace("RGB");
+		op.filter("LanczosRadius");
+		op.resize(width, height, '!');
+		op.colorspace("sRGB");
+		op.addImage("png:-");
+
+		Stream2BufferedImage s2b = new Stream2BufferedImage();
+		cmd.setOutputConsumer(s2b);
+		try {
+			cmd.run(op, image);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return s2b.getImage();
 	}
 
 	public static BufferedImage resizeBox(BufferedImage image, int width, int height) {
-		ResampleOp op = new ResampleOp(width, height);
-		op.setFilter(ResampleFilters.getBoxFilter());
-		return op.filter(image, null);
+		BufferedImage resizedImage = new BufferedImage(width, height, image.getType());
+		Graphics2D g = resizedImage.createGraphics();
+		g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+		g.drawImage(image, 0, 0, width, height, null);
+		g.dispose();
+		return resizedImage;
 	}
 
 	public static void saveImage(BufferedImage image, String location) {

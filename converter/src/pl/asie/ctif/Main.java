@@ -88,20 +88,28 @@ public class Main {
 				0, 0, 0.5f,
 				0.25f, 0.25f, 0
 		});
+		DITHER_ARRAYS.put("checks", new float[] {
+				0, 1,
+				1, 0,
+				2
+		});
 		DITHER_ARRAYS.put("2x2", new float[] {
 				0, 2,
 				3, 1,
+				4
 		});
 		DITHER_ARRAYS.put("3x3", new float[] {
 				0, 7, 3,
 				6, 5, 2,
-				4, 1, 8
+				4, 1, 8,
+				9
 		});
 		DITHER_ARRAYS.put("4x4", new float[] {
 				0, 8, 2, 10,
 				12, 4, 14, 6,
 				3, 11, 1, 9,
-				15, 7, 13, 5
+				15, 7, 13, 5,
+				16
 		});
 		DITHER_ARRAYS.put("8x8", new float[] {
 				0, 48, 12, 60, 3, 51, 15, 63,
@@ -111,7 +119,41 @@ public class Main {
 				2, 50, 14, 62, 1, 49, 13, 61,
 				34, 18, 46, 30, 33, 17, 45, 29,
 				10, 58, 6, 54, 9, 57, 5, 53,
-				42, 26, 38, 22, 41, 25, 37, 21
+				42, 26, 38, 22, 41, 25, 37, 21,
+				64
+		});
+
+		for (int i = 3; i <= 8; i++) {
+			float[] arrL = new float[i * i + 1];
+			float[] arrR = new float[i * i + 1];
+			float[] arrS = new float[i * i + 1];
+			arrL[i * i] = arrR[i * i] = arrS[i * i] = i;
+			for (int j = 0; j < i; j++) {
+				for (int k = 0; k < i; k++) {
+					arrL[k * i + j] = ((i - 1 - j) + (i - k)) % i;
+					arrR[k * i + j] = (j + (i - k)) % i;
+					arrS[k * i + j] = Math.max(k, j);
+				}
+			}
+
+			DITHER_ARRAYS.put("diag-l-" + i + "x" + i, arrL);
+			DITHER_ARRAYS.put("diag-r-" + i + "x" + i, arrR);
+			DITHER_ARRAYS.put("square-" + i + "x" + i, arrS);
+		}
+
+		DITHER_ARRAYS.put("diagl-4x4", new float[] {
+				3, 2, 1, 0,
+				2, 1, 0, 3,
+				1, 0, 3, 2,
+				0, 3, 2, 1,
+				4
+		});
+		DITHER_ARRAYS.put("diagr-4x4", new float[] {
+				0, 1, 2, 3,
+				3, 0, 1, 2,
+				2, 3, 0, 1,
+				1, 2, 3, 0,
+				4
 		});
 	}
 

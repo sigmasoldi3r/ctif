@@ -24,14 +24,23 @@ public class Converter {
 	private final float[][] img;
 	private final float[][] pal;
 	private final int cw, ch, pw, ph;
+	private final int ditherMax;
 
 	public Converter(Color[] colors, BufferedImage image, DitherMode ditherMode, float[] ditherMatrix) {
 		int i = 0;
 
 		this.ditherMode = ditherMode;
 		this.ditherMatrix = ditherMatrix;
-		this.ditherMatrixSize = ditherMatrix != null ? (int) Math.sqrt(ditherMatrix.length) : 0;
-		this.ditherMatrixOffset = (ditherMatrixSize - 1) / 2;
+		if (ditherMode == DitherMode.ORDERED) {
+			assert ditherMatrix != null;
+			this.ditherMatrixSize = (int) Math.sqrt(ditherMatrix.length - 1);
+			this.ditherMatrixOffset = 0;
+			this.ditherMax = (int) ditherMatrix[ditherMatrix.length - 1];
+		} else {
+			this.ditherMatrixSize = ditherMatrix != null ? (int) Math.sqrt(ditherMatrix.length) : 0;
+			this.ditherMatrixOffset = (ditherMatrixSize - 1) / 2;
+			this.ditherMax = 0;
+		}
 
 		this.image = image;
 		this.palette = colors;
@@ -44,8 +53,8 @@ public class Converter {
 		this.cw = image.getWidth() / pw;
 		this.ch = image.getHeight() / ph;
 
-		for (int comp : Utils.getRGB(image)) {
-			img[i++] = Main.COLORSPACE.fromRGB(comp);
+		for (i = 0; i < img.length; i++) {
+			img[i] = Main.COLORSPACE.fromRGB(image.getRGB(i % image.getWidth(), i / image.getWidth()));
 		}
 
 		for (i = 0; i < colors.length; i++) {
@@ -199,46 +208,31 @@ public class Converter {
 								}
 							}
 						} else {
+							// http://bisqwit.iki.fi/story/howto/dither/jy/
+
+							cerr += Utils.getColorDistanceSq(col1, col2) * 0.1 * pixels.length;
+
 							for (int i = 0; i < pixels.length; i++) {
 								float[] col = pixels[i];
 								int qx = (i % pw);
 								int qy = (i / pw);
 
-								double bicerr = Double.MAX_VALUE;
-								int birat = 0;
-								int jMax = ditherMatrixSize * ditherMatrixSize;
+								float jf =
+										(col[0]*col1[0] - col[0]*col2[0] - col1[0]*col2[0] + col2[0]*col2[0] +
+										 col[1]*col1[1] - col[1]*col2[1] - col1[1]*col2[1] + col2[1]*col2[1] +
+									 	 col[2]*col1[2] - col[2]*col2[2] - col1[2]*col2[2] + col2[2]*col2[2]) /
+										((col1[0]-col2[0])*(col1[0]-col2[0]) +
+										 (col1[1]-col2[1])*(col1[1]-col2[1]) +
+										 (col1[2]-col2[2])*(col1[2]-col2[2]));
+								int birat = ditherMax - Math.round(jf * ditherMax);
+								if (birat < 0) birat = 0;
+								else if (birat > ditherMax) birat = ditherMax;
 
-								double cerr1 = Utils.getColorDistanceSq(col, col1);
-								double cerr2 = Utils.getColorDistanceSq(col, col2);
-								if (cerr1 < cerr2) {
-									bicerr = cerr1;
-									birat = 0;
-									for (int j = 1; j < jMax; j++) {
-										colA[0] = (col2[0] * j + col1[0] * (jMax - j)) / jMax;
-										colA[1] = (col2[1] * j + col1[1] * (jMax - j)) / jMax;
-										colA[2] = (col2[2] * j + col1[2] * (jMax - j)) / jMax;
+								colA[0] = (col2[0] * birat + col1[0] * (ditherMax - birat)) / ditherMax;
+								colA[1] = (col2[1] * birat + col1[1] * (ditherMax - birat)) / ditherMax;
+								colA[2] = (col2[2] * birat + col1[2] * (ditherMax - birat)) / ditherMax;
+								cerr += Utils.getColorDistanceSq(col, colA);
 
-										double icerr = Utils.getColorDistanceSq(col, colA);
-										if (icerr > bicerr) break;
-										bicerr = icerr;
-										birat = j;
-									}
-								} else {
-									bicerr = cerr2;
-									birat = jMax;
-									for (int j = jMax - 1; j > 0; j--) {
-										colA[0] = (col2[0] * j + col1[0] * (jMax - j)) / jMax;
-										colA[1] = (col2[1] * j + col1[1] * (jMax - j)) / jMax;
-										colA[2] = (col2[2] * j + col1[2] * (jMax - j)) / jMax;
-
-										double icerr = Utils.getColorDistanceSq(col, colA);
-										if (icerr > bicerr) break;
-										bicerr = icerr;
-										birat = j;
-									}
-								}
-
-								cerr += bicerr + Utils.getColorDistanceSq(col1, col2) * 0.1;
 								if (cerr >= bcerr)
 									break;
 
