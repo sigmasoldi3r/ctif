@@ -124,6 +124,15 @@ public class Converter {
 
 		float[] colA = new float[3];
 
+		boolean usePalMap = Main.OPTIMIZATION_LEVEL > 0 && Main.PLATFORM instanceof PlatformOpenComputers && ((PlatformOpenComputers) Main.PLATFORM).tier == 3;
+		int[] palMap = new int[palette.length];
+		int palMapLength;
+		for (int i = 0; i < 16; i++)
+			palMap[i] = i;
+		int t3OffRed = Main.OPTIMIZATION_LEVEL <= 1 ? 3 : (Main.OPTIMIZATION_LEVEL == 2 ? 2 : 1);
+		int t3OffGreen = Main.OPTIMIZATION_LEVEL <= 1 ? 3 : (Main.OPTIMIZATION_LEVEL <= 3 ? 2 : 1);
+		int t3OffBlue = Main.OPTIMIZATION_LEVEL <= 1 ? 2 : 1;
+
 		for (int cy = 0; cy < ch; cy++) {
 			for (int cx = 0; cx < cw; cx++) {
 				for (int py = 0; py < ph; py++) {
@@ -135,12 +144,39 @@ public class Converter {
 				int bci1 = 0, bci2 = 0;
 				double bcerr = Double.MAX_VALUE;
 
-				for (int ci1 = 1; ci1 < pal.length; ci1++) {
+				if (usePalMap) {
+					palMapLength = 16;
+					int[] colorsUsed = new int[palette.length];
+					for (int py = 0; py < ph; py++) {
+						for (int px = 0; px < pw; px++) {
+							int rgb = image.getRGB(cx * pw + px, cy * ph + py);
+							int red = (((rgb >> 16) & 0xFF) * 6 / 256);
+							int green = (((rgb >> 8) & 0xFF) * 8 / 256);
+							int blue = ((rgb & 0xFF) * 5 / 256);
+							for (int rr = red - t3OffRed; rr <= red + t3OffRed; rr++)
+								for (int rg = green - t3OffGreen; rg <= green + t3OffGreen; rg++)
+									for (int rb = blue - t3OffBlue; rb <= blue + t3OffBlue; rb++)
+										if (rr >= 0 && rg >= 0 && rb >= 0 && rr < 6 && rg < 8 && rb < 5) {
+											int col = 16 + rr * 40 + rg * 5 + rb;
+											if (colorsUsed[col] == 0) {
+												palMap[palMapLength++] = col;
+												colorsUsed[col] = 1;
+											}
+										}
+						}
+					}
+				} else {
+					palMapLength = palette.length;
+				}
+
+				for (int cim1 = 1; cim1 < palMapLength; cim1++) {
 					if (bcerr == 0) break;
+					int ci1 = usePalMap ? palMap[cim1] : cim1;
 					float[] col1 = pal[ci1];
 
-					for (int ci2 = (Main.PLATFORM instanceof PlatformZXSpectrum) ? (ci1 >= 8 ? 8 : 0) : 0; ci2 < ci1; ci2++) {
+					for (int cim2 = (Main.PLATFORM instanceof PlatformZXSpectrum) ? (cim1 >= 8 ? 8 : 0) : 0; cim2 < cim1; cim2++) {
 						if (bcerr == 0) break;
+						int ci2 = usePalMap ? palMap[cim2] : cim2;
 						float[] col2 = pal[ci2];
 						double cerr = 0;
 

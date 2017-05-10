@@ -75,7 +75,7 @@ public class PaletteGenerator {
 
     public Color[] generate(int threads) {
         Result bestResult = null;
-        Worker[] workers = new Worker[10];
+        Worker[] workers = new Worker[20 / (Main.OPTIMIZATION_LEVEL + 1)];
         ExecutorService executorService = Executors.newFixedThreadPool(threads);
 
         for (int i = 0; i < workers.length; i++) {

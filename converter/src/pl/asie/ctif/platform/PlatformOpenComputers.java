@@ -3,7 +3,7 @@ package pl.asie.ctif.platform;
 import java.awt.*;
 
 public class PlatformOpenComputers extends Platform {
-    private final int tier;
+    public final int tier;
 
     public PlatformOpenComputers(int tier) {
         super(1, 2, 4, 0, 0, 0);

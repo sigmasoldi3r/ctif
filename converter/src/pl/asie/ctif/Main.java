@@ -22,6 +22,9 @@ public class Main {
 		@Parameter(names = {"-m", "--mode"}, description = "Target platform (cc, cc-paletted, oc-tier2, oc-tier3)")
 		private String mode = "oc-tier3";
 
+		@Parameter(names = {"-O", "--optimization-level"}, description = "Optimization level [primarily 0-4]. Larger levels = less accurate but faster generated images. Default is 1.")
+		private int optimizationLevel = 1;
+
 		@Parameter(names = {"--colorspace"}, description = "Colorspace (rgb, yuv, yiq)")
 		private String colorspace = "yiq";
 
@@ -61,6 +64,7 @@ public class Main {
 
 	public static Colorspace COLORSPACE = null;
 	public static Platform PLATFORM = null;
+	public static int OPTIMIZATION_LEVEL = 1;
 	private static final Map<String, float[]> DITHER_ARRAYS = new HashMap<>();
 	private static final Map<String, Platform> PLATFORMS = new HashMap<>();
 	private static final Map<String, Colorspace> COLORSPACES = new HashMap<>();
@@ -127,18 +131,32 @@ public class Main {
 			float[] arrL = new float[i * i + 1];
 			float[] arrR = new float[i * i + 1];
 			float[] arrS = new float[i * i + 1];
-			arrL[i * i] = arrR[i * i] = arrS[i * i] = i;
+			arrL[i * i] = arrR[i * i] = i;
+			arrS[i * i] = i * i;
 			for (int j = 0; j < i; j++) {
 				for (int k = 0; k < i; k++) {
 					arrL[k * i + j] = ((i - 1 - j) + (i - k)) % i;
 					arrR[k * i + j] = (j + (i - k)) % i;
-					arrS[k * i + j] = Math.max(k, j);
+					arrS[k * i + j] = Math.max(k, j) * Math.max(k, j);
 				}
 			}
 
 			DITHER_ARRAYS.put("diag-l-" + i + "x" + i, arrL);
 			DITHER_ARRAYS.put("diag-r-" + i + "x" + i, arrR);
 			DITHER_ARRAYS.put("square-" + i + "x" + i, arrS);
+		}
+
+		for (int i = 3; i <= 8; i += 2) {
+			float[] arrD = new float[i * i + 1];
+			arrD[i * i] = i * i;
+			int center = i / 2;
+			for (int j = 0; j < i; j++) {
+				for (int k = 0; k < i; k++) {
+					arrD[k * i + j] = Math.abs(j - center) + Math.abs(k - center);
+					arrD[k * i + j] *= arrD[k * i + j];
+				}
+			}
+			DITHER_ARRAYS.put("diamond-" + i + "x" + i, arrD);
 		}
 
 		DITHER_ARRAYS.put("diagl-4x4", new float[] {
@@ -191,6 +209,7 @@ public class Main {
 			System.exit(1);
 		}
 
+		OPTIMIZATION_LEVEL = params.optimizationLevel;
 		DEBUG = params.debug;
 		if (params.ditherType == null) {
 			switch (params.ditherMode) {
