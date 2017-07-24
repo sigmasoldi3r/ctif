@@ -7,7 +7,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-public class PaletteGenerator {
+public class PaletteGeneratorKMeans {
     static class Result {
         final Color[] colors;
         final double error;
@@ -37,19 +37,57 @@ public class PaletteGenerator {
     private final Map<float[], Double> knownBestError = new HashMap<>();
     private final Map<float[], Integer> knownBestCentroid = new HashMap<>();
 
-    public PaletteGenerator(BufferedImage image, Color[] base, int colors) {
+    public PaletteGeneratorKMeans(BufferedImage image, Color[] base, int colors, int samplingRes) {
         this.colors = colors;
         this.image = image;
         this.base = base;
         this.centroids = new float[base.length][];
 
-        for (int i : Utils.getRGB(image)) {
-            if (!pointsAdded.containsKey(i)) {
-                float[] key = Main.COLORSPACE.fromRGB(i);
-                pointsAdded.put(i, key);
-                pointsWeight.put(key, 1);
+        if (samplingRes > 0) {
+            int maximum = samplingRes;
+            float stepX = (float) image.getWidth() / maximum;
+            float stepY = (float) image.getHeight() / maximum;
+            int stepIX = (int) Math.ceil(stepX);
+            int stepIY = (int) Math.ceil(stepY);
+            for (int jy = 0; jy < maximum; jy++) {
+                for (int jx = 0; jx < maximum * 2; jx++) {
+                    int i = image.getRGB(random.nextInt(stepIX) + (int) ((jx % maximum) * stepX), random.nextInt(stepIY) + (int) (jy * stepY));
+                    if (!pointsAdded.containsKey(i)) {
+                        float[] key = Main.COLORSPACE.fromRGB(i);
+                        pointsAdded.put(i, key);
+                        pointsWeight.put(key, 1);
+                    } else {
+                        pointsWeight.put(pointsAdded.get(i), pointsWeight.get(pointsAdded.get(i)) + 1);
+                    }
+                }
+            }
+        } else {
+            if (Main.OPTIMIZATION_LEVEL >= 3 && (image.getWidth() * image.getHeight() >= 4096)) {
+                for (int jy = 0; jy < image.getHeight(); jy += 4) {
+                    int my = Math.min(4, image.getHeight() - jy);
+                    for (int jx = 0; jx < image.getWidth(); jx += 4) {
+                        int mx = Math.min(4, image.getWidth() - jx);
+
+                        int i = image.getRGB(random.nextInt(mx) + jx, random.nextInt(my) + jy);
+                        if (!pointsAdded.containsKey(i)) {
+                            float[] key = Main.COLORSPACE.fromRGB(i);
+                            pointsAdded.put(i, key);
+                            pointsWeight.put(key, 1);
+                        } else {
+                            pointsWeight.put(pointsAdded.get(i), pointsWeight.get(pointsAdded.get(i)) + 1);
+                        }
+                    }
+                }
             } else {
-                pointsWeight.put(pointsAdded.get(i), pointsWeight.get(pointsAdded.get(i)) + 1);
+                for (int i : Utils.getRGB(image)) {
+                    if (!pointsAdded.containsKey(i)) {
+                        float[] key = Main.COLORSPACE.fromRGB(i);
+                        pointsAdded.put(i, key);
+                        pointsWeight.put(key, 1);
+                    } else {
+                        pointsWeight.put(pointsAdded.get(i), pointsWeight.get(pointsAdded.get(i)) + 1);
+                    }
+                }
             }
         }
 

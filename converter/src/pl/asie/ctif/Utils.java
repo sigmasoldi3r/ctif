@@ -57,8 +57,8 @@ public final class Utils {
 		}
 	}
 
-	public static BufferedImage resize(BufferedImage image, int width, int height) {
-		ConvertCmd cmd = createConvertCmd();
+	public static BufferedImage resize(BufferedImage image, int width, int height, boolean forceNoImagemagick) {
+		ConvertCmd cmd = forceNoImagemagick ? null : createConvertCmd();
 		if (cmd == null) {
 			BufferedImage resizedImage = new BufferedImage(width, height, image.getType());
 			Graphics2D g = resizedImage.createGraphics();

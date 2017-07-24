@@ -3,6 +3,7 @@ package pl.asie.ctif;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.util.*;
 
@@ -16,8 +17,17 @@ import pl.asie.ctif.platform.PlatformZXSpectrum;
 
 public class Main {
 	private static class Parameters {
+		@Parameter(names = {"--palette-sampling-resolution"}, description = "The sampling resolution for palette generation. 0 = full image (1/4x1/4 image in -O3+)")
+		private int paletteSamplingResolution = 0;
+
 		@Parameter(names = {"--threads"}, description = "Amount of threads to create")
 		private int threads = Runtime.getRuntime().availableProcessors();
+
+		@Parameter(names = {"--palette-export"}, description = "File to export the palette to.")
+		private String paletteExport;
+
+		@Parameter(names = {"--palette"}, description = "File to load the palette from.")
+		private String palette;
 
 		@Parameter(names = {"-m", "--mode"}, description = "Target platform (cc, cc-paletted, oc-tier2, oc-tier3)")
 		private String mode = "oc-tier3";
@@ -60,7 +70,16 @@ public class Main {
 
 		@Parameter(names = {"-h", "--help"}, description = "Print usage", help = true)
 		private boolean help;
+
+		@Parameter(names = {"--resize-mode"}, description = "Resize mode")
+		private ResizeMode resizeMode;
 	}
+
+	public enum ResizeMode {
+		SPEED,
+		QUALITY_NATIVE,
+		QUALITY
+	};
 
 	public static Colorspace COLORSPACE = null;
 	public static Platform PLATFORM = null;
@@ -232,11 +251,21 @@ public class Main {
 		params.w = (params.w > 0) ? rCeil(params.w, PLATFORM.getCharWidth()) : 0;
 		params.h = (params.h > 0) ? rCeil(params.h, PLATFORM.getCharHeight()) : 0;
 
-		if (params.w > 0 && params.h == 0) {
-			params.h = params.w * image.getHeight() / image.getWidth();
-		} else if (params.w == 0 && params.h > 0) {
-			params.w = params.h * image.getWidth() / image.getHeight();
+		if (params.w == 0) params.w = PLATFORM.getWidthPx();
+		if (params.h == 0) params.h = PLATFORM.getHeightPx();
+
+		if (!params.ignoreAspectRatio) {
+			float x = (params.ignoreAspectRatio ? PLATFORM.getDefaultAspectRatio() : (float) image.getWidth() / image.getHeight());
+			float y = 1.0f;
+			float a = Math.min(Math.min(
+					(float) params.w / x,
+					(float) params.h / y),
+					(float) Math.sqrt((float) PLATFORM.getCharsPx() / (x * y)));
+			params.w = rCeil((int) Math.floor(x * a), PLATFORM.getCharWidth());
+			params.h = rCeil((int) Math.floor(y * a), PLATFORM.getCharHeight());
 		}
+
+		System.out.println(params.w + " " + params.h);
 
 		if (params.w * params.h > PLATFORM.getCharsPx()) {
 			System.err.println(String.format("Size too large: %dx%d (maximum size: %d pixels)", params.w, params.h, PLATFORM.getCharsPx()));
@@ -249,17 +278,6 @@ public class Main {
 			System.exit(1);
 		}
 
-		if (params.w == 0 || params.h == 0) {
-			float x = (params.ignoreAspectRatio ? PLATFORM.getDefaultAspectRatio() : (float) image.getWidth() / image.getHeight());
-			float y = 1.0f;
-			float a = Math.min(Math.min(
-					(float) PLATFORM.getWidthPx() / x,
-					(float) PLATFORM.getHeightPx() / y),
-					(float) Math.sqrt((float) PLATFORM.getCharsPx() / (x*y)));
-			params.w = rCeil((int) Math.floor(x * a), PLATFORM.getCharWidth());
-			params.h = rCeil((int) Math.floor(y * a), PLATFORM.getCharHeight());
-		}
-
 		int width = params.w;
 		int height = params.h;
 
@@ -267,16 +285,62 @@ public class Main {
 			System.err.println("Using " + params.threads + " threads.");
 		}
 
-		BufferedImage resizedImage = image.getWidth() == width && image.getHeight() == height ? image : Utils.resize(image, width, height);
+		System.err.println("Resizing image...");
+		long timeR = System.currentTimeMillis();
+
+		BufferedImage resizedImage;
+		if (image.getWidth() == width && image.getHeight() == height) {
+			resizedImage = image;
+		} else if (params.resizeMode == ResizeMode.SPEED) {
+			resizedImage = Utils.resizeBox(image, width, height);
+		} else {
+			resizedImage = Utils.resize(image, width, height, params.resizeMode == ResizeMode.QUALITY_NATIVE);
+		}
+
+		timeR = System.currentTimeMillis() - timeR;
+		if (DEBUG) {
+			System.err.println("Image resize time: " + timeR + " ms");
+		}
 
 		if (PLATFORM.getCustomColorCount() > 0) {
-			long time = System.currentTimeMillis();
-			System.err.println("Generating palette...");
-			PaletteGenerator generator = new PaletteGenerator(resizedImage, palette, PLATFORM.getCustomColorCount());
-			palette = generator.generate(params.threads);
-			time = System.currentTimeMillis() - time;
-			if (DEBUG) {
-				System.err.println("Palette generation time: " + time + " ms");
+			if (params.palette != null) {
+				System.err.println("Reading palette...");
+				try {
+					FileInputStream inputStream = new FileInputStream(new File(params.palette));
+					for (int i = 0; i < PLATFORM.getCustomColorCount(); i++) {
+						int red = inputStream.read();
+						int green = inputStream.read();
+						int blue = inputStream.read();
+						palette[i] = new Color(red, green, blue);
+					}
+					inputStream.close();
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			} else {
+				long time = System.currentTimeMillis();
+				System.err.println("Generating palette...");
+				PaletteGeneratorKMeans generator = new PaletteGeneratorKMeans(resizedImage, palette, PLATFORM.getCustomColorCount(), params.paletteSamplingResolution);
+				palette = generator.generate(params.threads);
+				time = System.currentTimeMillis() - time;
+				if (DEBUG) {
+					System.err.println("Palette generation time: " + time + " ms");
+				}
+			}
+
+			if (params.paletteExport != null) {
+				System.err.println("Saving palette...");
+				try {
+					FileOutputStream outputStream = new FileOutputStream(new File(params.paletteExport));
+					for (int i = 0; i < palette.length; i++) {
+						outputStream.write(palette[i].getRed());
+						outputStream.write(palette[i].getGreen());
+						outputStream.write(palette[i].getBlue());
+					}
+					outputStream.close();
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
 			}
 		}
 

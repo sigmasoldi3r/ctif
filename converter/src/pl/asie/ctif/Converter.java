@@ -169,144 +169,193 @@ public class Converter {
 					palMapLength = palette.length;
 				}
 
-				for (int cim1 = 1; cim1 < palMapLength; cim1++) {
-					if (bcerr == 0) break;
-					int ci1 = usePalMap ? palMap[cim1] : cim1;
-					float[] col1 = pal[ci1];
+				boolean bcqFound = false;
 
-					for (int cim2 = (Main.PLATFORM instanceof PlatformZXSpectrum) ? (cim1 >= 8 ? 8 : 0) : 0; cim2 < cim1; cim2++) {
-						if (bcerr == 0) break;
-						int ci2 = usePalMap ? palMap[cim2] : cim2;
-						float[] col2 = pal[ci2];
-						double cerr = 0;
+				if (ditherMode == DitherMode.NONE && Main.OPTIMIZATION_LEVEL >= 3) {
+					int[] colors = new int[pixels.length];
+					int colorCount = 0;
+					boolean[] uColors = new boolean[palette.length];
 
-						for (int i = 0; i < quadrantLen; i++) {
-							cq[i] = 0;
-						}
+					for (int i = 0; i < pixels.length; i++) {
+						double bestDist = Double.MAX_VALUE;
+						int bestCol = 0;
 
-						if (ditherMode == DitherMode.NONE) {
-							for (int i = 0; i < pixels.length; i++) {
-								float[] col = pixels[i];
-								double cerr1 = Utils.getColorDistanceSq(col, col1);
-								double cerr2 = Utils.getColorDistanceSq(col, col2);
-								if (cerr2 < cerr1) {
-									int pos = (pw * ph - 1 - i);
-									cq[pos >> 3] |= (1 << (pos & 7));
-									cerr += cerr2;
-								} else {
-									cerr += cerr1;
-								}
-
-								if (cerr >= bcerr)
-									break;
-							}
-						} else if (ditherMode == DitherMode.ERROR) {
-							for (int i = 0; i < pixels.length; i++) {
-								tPixels[i][0] = pixels[i][0];
-								tPixels[i][1] = pixels[i][1];
-								tPixels[i][2] = pixels[i][2];
-							}
-
-							for (int i = 0; i < errors.length; i++) {
-								errors[i][0] = 0;
-								errors[i][1] = 0;
-								errors[i][2] = 0;
-							}
-
-							for (int i = 0; i < tPixels.length; i++) {
-								float[] col = tPixels[i];
-								float[] colR;
-								double cerr1 = Utils.getColorDistanceSq(col, col1);
-								double cerr2 = Utils.getColorDistanceSq(col, col2);
-								if (cerr2 < cerr1) {
-									int pos = (pw * ph - 1 - i);
-									cq[pos >> 3] |= (1 << (pos & 7));
-									cerr += cerr2;
-									colR = col2;
-								} else {
-									cerr += cerr1;
-									colR = col1;
-								}
-
-								if (cerr >= bcerr)
-									break;
-
-								int qx = (i % pw);
-								int qy = (i / pw);
-
-								int ip = ditherMatrixSize * ditherMatrixOffset;
-								for (int iy = 0; iy < ditherMatrixSize - ditherMatrixOffset; iy++) {
-									for (int ix = -ditherMatrixOffset; ix < ditherMatrixSize - ditherMatrixOffset; ix++) {
-										addQuantError(tPixels, qx + ix, qy + iy, pw, ph, col, colR, ditherMatrix[ip]);
-										addQuantError(errors, qx + ix + ditherMatrixOffset, qy + iy + ditherMatrixOffset, ew, eh, col, colR, ditherMatrix[ip]);
-										ip++;
-									}
-								}
-							}
-						} else {
-							// http://bisqwit.iki.fi/story/howto/dither/jy/
-
-							cerr += Utils.getColorDistanceSq(col1, col2) * 0.1 * pixels.length;
-
-							for (int i = 0; i < pixels.length; i++) {
-								float[] col = pixels[i];
-								int qx = (i % pw);
-								int qy = (i / pw);
-
-								float jf =
-										(col[0]*col1[0] - col[0]*col2[0] - col1[0]*col2[0] + col2[0]*col2[0] +
-										 col[1]*col1[1] - col[1]*col2[1] - col1[1]*col2[1] + col2[1]*col2[1] +
-									 	 col[2]*col1[2] - col[2]*col2[2] - col1[2]*col2[2] + col2[2]*col2[2]) /
-										((col1[0]-col2[0])*(col1[0]-col2[0]) +
-										 (col1[1]-col2[1])*(col1[1]-col2[1]) +
-										 (col1[2]-col2[2])*(col1[2]-col2[2]));
-								int birat = ditherMax - Math.round(jf * ditherMax);
-								if (birat < 0) birat = 0;
-								else if (birat > ditherMax) birat = ditherMax;
-
-								colA[0] = (col2[0] * birat + col1[0] * (ditherMax - birat)) / ditherMax;
-								colA[1] = (col2[1] * birat + col1[1] * (ditherMax - birat)) / ditherMax;
-								colA[2] = (col2[2] * birat + col1[2] * (ditherMax - birat)) / ditherMax;
-								cerr += Utils.getColorDistanceSq(col, colA);
-
-								if (cerr >= bcerr)
-									break;
-
-								int threshold = (int) ditherMatrix[((cy * ph + qy) % ditherMatrixSize) * ditherMatrixSize + ((cx * pw + qx) % ditherMatrixSize)];
-								if (threshold < birat) {
-									int pos = (pw * ph - 1 - i);
-									cq[pos >> 3] |= (1 << (pos & 7));
-								}
+						for (int cim1 = 0; cim1 < palMapLength; cim1++) {
+							int ci1 = usePalMap ? palMap[cim1] : cim1;
+							float[] col1 = pal[ci1];
+							double dist = Utils.getColorDistanceSq(col1, pixels[i]);
+							if (dist < bestDist) {
+								bestCol = ci1;
+								bestDist = dist;
 							}
 						}
 
-						if (cerr < bcerr) {
-							bci1 = ci1;
-							bci2 = ci2;
-							bcerr = cerr;
-							if (ditherMode == DitherMode.ERROR) {
-								for (int i = 0; i < errors.length; i++) {
-									bcea[i][0] = errors[i][0];
-									bcea[i][1] = errors[i][1];
-									bcea[i][2] = errors[i][2];
-								}
-							}
-							for (int i = 0; i < quadrantLen; i++) {
-								bcq[i] = cq[i];
+						if (!uColors[bestCol]) {
+							uColors[bestCol] = true;
+							colors[colorCount++] = bestCol;
+						}
+					}
+
+					if (colorCount <= 2) {
+						bci1 = colors[0];
+						bci2 = colors[1];
+
+						for (int i = 0; i < bcq.length; i++)
+							bcq[i] = 0;
+
+						for (int i = 0; i < pixels.length; i++) {
+							int pos = (pw * ph - 1 - i);
+							double dist0 = Utils.getColorDistanceSq(pal[bci1], pixels[i]);
+							double dist1 = Utils.getColorDistanceSq(pal[bci2], pixels[i]);
+							if (dist1 < dist0) {
+								bcq[pos >> 3] |= (1 << (pos & 7));
 							}
 						}
+
+						bcqFound = true;
 					}
 				}
 
-				if (ditherMode == DitherMode.ERROR) {
-					for (int iy = 0; iy < eh; iy++) {
-						int ry = cy * ph + iy - ditherMatrixOffset;
-						if (ry >= 0 && ry < ch * ph) {
-							for (int ix = 0; ix < ew; ix++) {
-								int rx = cx * pw + ix - ditherMatrixOffset;
-								if (rx >= 0 && rx < cw * pw) {
-									for (int i = 0; i < 3; i++) {
-										img[ry * cw * pw + rx][i] += bcea[iy * ew + ix][i];
+				if (!bcqFound) {
+					for (int cim1 = 1; cim1 < palMapLength; cim1++) {
+						if (bcerr == 0) break;
+						int ci1 = usePalMap ? palMap[cim1] : cim1;
+						float[] col1 = pal[ci1];
+
+						for (int cim2 = (Main.PLATFORM instanceof PlatformZXSpectrum) ? (cim1 >= 8 ? 8 : 0) : 0; cim2 < cim1; cim2++) {
+							if (bcerr == 0) break;
+							int ci2 = usePalMap ? palMap[cim2] : cim2;
+							float[] col2 = pal[ci2];
+							double cerr = 0;
+
+							for (int i = 0; i < quadrantLen; i++) {
+								cq[i] = 0;
+							}
+
+							if (ditherMode == DitherMode.NONE) {
+								for (int i = 0; i < pixels.length; i++) {
+									float[] col = pixels[i];
+									double cerr1 = Utils.getColorDistanceSq(col, col1);
+									double cerr2 = Utils.getColorDistanceSq(col, col2);
+									if (cerr2 < cerr1) {
+										int pos = (pw * ph - 1 - i);
+										cq[pos >> 3] |= (1 << (pos & 7));
+										cerr += cerr2;
+									} else {
+										cerr += cerr1;
+									}
+
+									if (cerr >= bcerr)
+										break;
+								}
+							} else if (ditherMode == DitherMode.ERROR) {
+								for (int i = 0; i < pixels.length; i++) {
+									tPixels[i][0] = pixels[i][0];
+									tPixels[i][1] = pixels[i][1];
+									tPixels[i][2] = pixels[i][2];
+								}
+
+								for (int i = 0; i < errors.length; i++) {
+									errors[i][0] = 0;
+									errors[i][1] = 0;
+									errors[i][2] = 0;
+								}
+
+								for (int i = 0; i < tPixels.length; i++) {
+									float[] col = tPixels[i];
+									float[] colR;
+									double cerr1 = Utils.getColorDistanceSq(col, col1);
+									double cerr2 = Utils.getColorDistanceSq(col, col2);
+									if (cerr2 < cerr1) {
+										int pos = (pw * ph - 1 - i);
+										cq[pos >> 3] |= (1 << (pos & 7));
+										cerr += cerr2;
+										colR = col2;
+									} else {
+										cerr += cerr1;
+										colR = col1;
+									}
+
+									if (cerr >= bcerr)
+										break;
+
+									int qx = (i % pw);
+									int qy = (i / pw);
+
+									int ip = ditherMatrixSize * ditherMatrixOffset;
+									for (int iy = 0; iy < ditherMatrixSize - ditherMatrixOffset; iy++) {
+										for (int ix = -ditherMatrixOffset; ix < ditherMatrixSize - ditherMatrixOffset; ix++) {
+											addQuantError(tPixels, qx + ix, qy + iy, pw, ph, col, colR, ditherMatrix[ip]);
+											addQuantError(errors, qx + ix + ditherMatrixOffset, qy + iy + ditherMatrixOffset, ew, eh, col, colR, ditherMatrix[ip]);
+											ip++;
+										}
+									}
+								}
+							} else {
+								// http://bisqwit.iki.fi/story/howto/dither/jy/
+
+								cerr += Utils.getColorDistanceSq(col1, col2) * 0.1 * pixels.length;
+
+								for (int i = 0; i < pixels.length; i++) {
+									float[] col = pixels[i];
+									int qx = (i % pw);
+									int qy = (i / pw);
+
+									float jf =
+											(col[0] * col1[0] - col[0] * col2[0] - col1[0] * col2[0] + col2[0] * col2[0] +
+													col[1] * col1[1] - col[1] * col2[1] - col1[1] * col2[1] + col2[1] * col2[1] +
+													col[2] * col1[2] - col[2] * col2[2] - col1[2] * col2[2] + col2[2] * col2[2]) /
+													((col1[0] - col2[0]) * (col1[0] - col2[0]) +
+															(col1[1] - col2[1]) * (col1[1] - col2[1]) +
+															(col1[2] - col2[2]) * (col1[2] - col2[2]));
+									int birat = ditherMax - Math.round(jf * ditherMax);
+									if (birat < 0) birat = 0;
+									else if (birat > ditherMax) birat = ditherMax;
+
+									colA[0] = (col2[0] * birat + col1[0] * (ditherMax - birat)) / ditherMax;
+									colA[1] = (col2[1] * birat + col1[1] * (ditherMax - birat)) / ditherMax;
+									colA[2] = (col2[2] * birat + col1[2] * (ditherMax - birat)) / ditherMax;
+									cerr += Utils.getColorDistanceSq(col, colA);
+
+									if (cerr >= bcerr)
+										break;
+
+									int threshold = (int) ditherMatrix[((cy * ph + qy) % ditherMatrixSize) * ditherMatrixSize + ((cx * pw + qx) % ditherMatrixSize)];
+									if (threshold < birat) {
+										int pos = (pw * ph - 1 - i);
+										cq[pos >> 3] |= (1 << (pos & 7));
+									}
+								}
+							}
+
+							if (cerr < bcerr) {
+								bci1 = ci1;
+								bci2 = ci2;
+								bcerr = cerr;
+								if (ditherMode == DitherMode.ERROR) {
+									for (int i = 0; i < errors.length; i++) {
+										bcea[i][0] = errors[i][0];
+										bcea[i][1] = errors[i][1];
+										bcea[i][2] = errors[i][2];
+									}
+								}
+								for (int i = 0; i < quadrantLen; i++) {
+									bcq[i] = cq[i];
+								}
+							}
+						}
+					}
+
+					if (ditherMode == DitherMode.ERROR) {
+						for (int iy = 0; iy < eh; iy++) {
+							int ry = cy * ph + iy - ditherMatrixOffset;
+							if (ry >= 0 && ry < ch * ph) {
+								for (int ix = 0; ix < ew; ix++) {
+									int rx = cx * pw + ix - ditherMatrixOffset;
+									if (rx >= 0 && rx < cw * pw) {
+										for (int i = 0; i < 3; i++) {
+											img[ry * cw * pw + rx][i] += bcea[iy * ew + ix][i];
+										}
 									}
 								}
 							}
