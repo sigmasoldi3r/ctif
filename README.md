@@ -22,6 +22,10 @@ will convert image.png to image.ctif and kindly save preview.png as a preview fi
 will convert your image into a ComputerCraft picture of at most 102x57. If you want to ignore the aspect ratio and force it to be 
 exactly 102x57, use "-N".
 
+## Note when running on Windows
+
+Download **imagemagick** for java, then add the path to an env variable called `IM4JAVA_TOOLPATH`
+
 # Viewers
 
 If you just want to view CTIF files, see the viewers directory.
@@ -33,3 +37,7 @@ multiply the width by 2 and the height by 3.
 * ctif-oc.lua - OpenComputers image viewer. Not optimized - expect it to load images slower than what you saw at BTM. Requires Lua 5.3.
 
 An optimized OpenComputers viewer will be released as part of the promised-at-BTM15 release of OpenPoint soon.
+
+## OpenComputers note
+
+To run this, you need to set the `CPU`'s architecture to **Lua 5.3**, to do this, just *sneak-click the cpu while holding it*.
